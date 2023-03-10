@@ -1,4 +1,9 @@
 {
+  "jest.autoRun": {},
+  "jest.jestCommandLine": "yarn test",
+  "terminal.integrated.env.osx": {
+    "PATH": "${env:PATH}"
+  },
   "editor.codeActionsOnSave": {
     "source.fixAll.eslint": true
   },

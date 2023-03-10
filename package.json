@@ -1,22 +1,28 @@
 {
   "name": "interpreter-ts",
   "devDependencies": {
-    "typescript": "^4.9.5",
+    "@types/jest": "^29.4.0",
+    "@types/node": "^14.11.2",
+    "@types/prompt-sync": "^4.2.0",
+    "@types/prompt-sync-history": "^1.0.1",
     "gts": "^3.1.1",
-    "@types/node": "^14.11.2"
+    "jest": "^29.5.0",
+    "ts-jest": "^29.0.5",
+    "ts-node": "^10.9.1",
+    "typescript": "~4.4.0"
   },
   "version": "1.0.0",
   "description": "Typescript port of Thorsten Ball's Monkey Interpreter",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "npx jest",
     "lint": "gts lint",
     "clean": "gts clean",
     "compile": "tsc",
     "fix": "gts fix",
     "prepare": "yarn run compile",
-    "pretest": "yarn run compile",
-    "posttest": "yarn run lint"
+    "posttest": "yarn run lint",
+    "repl": "node build/index.js"
   },
   "repository": {
     "type": "git",
@@ -27,5 +33,9 @@
   "bugs": {
     "url": "https://github.com/hutcho66/interpreter-ts/issues"
   },
-  "homepage": "https://github.com/hutcho66/interpreter-ts#readme"
+  "homepage": "https://github.com/hutcho66/interpreter-ts#readme",
+  "dependencies": {
+    "prompt-sync": "^4.2.0",
+    "prompt-sync-history": "^1.0.1"
+  }
 }

@@ -1,8 +1,6 @@
-type Book = {
-  title: string;
-  author: string;
-};
-const book: Book = {
-  title: 'Cool Book',
-  author: 'John Doe',
-};
+import start from './repl/repl';
+
+console.log('Welcome to Monkey programming language');
+console.log('Please enter commands below:');
+
+start();
