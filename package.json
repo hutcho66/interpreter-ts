@@ -1,0 +1,31 @@
+{
+  "name": "interpreter-ts",
+  "devDependencies": {
+    "typescript": "^4.9.5",
+    "gts": "^3.1.1",
+    "@types/node": "^14.11.2"
+  },
+  "version": "1.0.0",
+  "description": "Typescript port of Thorsten Ball's Monkey Interpreter",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "lint": "gts lint",
+    "clean": "gts clean",
+    "compile": "tsc",
+    "fix": "gts fix",
+    "prepare": "yarn run compile",
+    "pretest": "yarn run compile",
+    "posttest": "yarn run lint"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hutcho66/interpreter-ts.git"
+  },
+  "author": "James Hutcheon",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/hutcho66/interpreter-ts/issues"
+  },
+  "homepage": "https://github.com/hutcho66/interpreter-ts#readme"
+}
