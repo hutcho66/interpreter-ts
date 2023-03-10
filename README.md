@@ -1,6 +1,6 @@
 # Typescript Monkey Interpreter
 
-Typescript port of [Thorsten Ball's Monkey Interpreter](https://interpreterbook.com/>)
+Typescript port of [Thorsten Ball's Monkey Interpreter](https://interpreterbook.com/)
 
 ## Installation
 
