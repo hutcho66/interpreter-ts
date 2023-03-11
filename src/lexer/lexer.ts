@@ -2,6 +2,7 @@ import {Token, TokenType, lookupIdentifier} from '../token/token';
 
 export default class Lexer {
   tokenIterator: IterableIterator<Token>;
+  iteratorIndex = 0;
 
   constructor(private input: string) {
     this.tokenIterator = this.tokens();
@@ -16,29 +17,25 @@ export default class Lexer {
 
   // create token generator
   private *tokens(): IterableIterator<Token> {
-    let index = 0;
-    while (index < this.input.length) {
-      let char = this.input[index];
+    let char = this.peekChar();
 
-      // skip whitespace
-      while (this.isWhitespace(char)) {
-        index++;
-        char = this.input[index];
-      }
+    while (this.iteratorIndex < this.input.length) {
+      // eat whitespace
+      char = this.eatWhitespace();
 
       switch (char) {
         case '=':
-          if (this.input[index + 1] === '=') {
+          if (this.peekChar() === '=') {
             yield {type: TokenType.EQ, literal: '=='};
-            index++;
+            this.readChar(); // need to eat the extra char
           } else {
             yield {type: TokenType.ASSIGN, literal: char};
           }
           break;
         case '!':
-          if (this.input[index + 1] === '=') {
+          if (this.peekChar() === '=') {
             yield {type: TokenType.NEQ, literal: '!='};
-            index++;
+            this.readChar(); // need to eat the extra char
           } else {
             yield {type: TokenType.BANG, literal: char};
           }
@@ -81,36 +78,71 @@ export default class Lexer {
           break;
         default:
           if (this.isLetter(char)) {
-            // keep consuming while next char is letter
-            const start = index; // store initial position
-            while (this.isLetter(this.input[index])) {
-              index += 1;
-            }
-            // index now points at next non-char
-            const literal = this.input.substring(start, index);
+            const literal = this.readIdentifier();
             yield {
               type: lookupIdentifier(literal),
               literal,
             };
-            // because index is progressed switch, move it back one position
-            index--;
           } else if (this.isDigit(char)) {
-            // keep consuming while next char is digit
-            const start = index; // store initial position
-            while (this.isDigit(this.input[index])) {
-              index += 1;
-            }
-            // index now points at next non-char
-            const literal = this.input.substring(start, index);
+            const literal = this.readNumber();
             yield {type: TokenType.INT, literal};
-            // because index is progressed switch, move it back one position
-            index--;
           } else {
             yield {type: TokenType.ILLEGAL, literal: char};
           }
       }
-      index++;
+
+      // Increment char
+      char = this.readChar();
     }
+  }
+
+  // return next char and progress index
+  private readChar() {
+    return this.input[++this.iteratorIndex];
+  }
+
+  // return next char without progressing index
+  private peekChar() {
+    return this.input[this.iteratorIndex + 1];
+  }
+
+  // consume any whitespace and leave index pointing at next non-whitespace char
+  // return next non-whitespace char
+  private eatWhitespace() {
+    let char = this.input[this.iteratorIndex];
+    while (char === ' ' || char === '\t' || char === '\n' || char === '\r') {
+      this.iteratorIndex++;
+      char = this.input[this.iteratorIndex];
+    }
+    return char;
+  }
+
+  // consume chars to find an identifier,
+  // leave index pointing at last char of identifier so
+  // that progressing the index doesn't skip a char
+  private readIdentifier() {
+    const start = this.iteratorIndex;
+    let char = this.input[this.iteratorIndex];
+    while (this.isLetter(char)) {
+      char = this.input[++this.iteratorIndex];
+    }
+
+    this.iteratorIndex--; // move index back to point at last char of identifier
+    return this.input.substring(start, this.iteratorIndex + 1);
+  }
+
+  // consume chars to find an number,
+  // leave index pointing at last char of number so
+  // that progressing the index doesn't skip a char
+  private readNumber() {
+    const start = this.iteratorIndex;
+    let char = this.input[this.iteratorIndex];
+    while (this.isDigit(char)) {
+      char = this.input[++this.iteratorIndex];
+    }
+
+    this.iteratorIndex--; // move index back to point at last char of identifier
+    return this.input.substring(start, this.iteratorIndex + 1);
   }
 
   private isLetter(char: string) {
@@ -119,9 +151,5 @@ export default class Lexer {
 
   private isDigit(char: string) {
     return '0' <= char && '9' >= char;
-  }
-
-  private isWhitespace(char: string) {
-    return char === ' ' || char === '\t' || char === '\n' || char === '\r';
   }
 }
