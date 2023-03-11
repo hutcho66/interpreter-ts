@@ -1,5 +1,5 @@
-import {Token, TokenType} from '../token/token';
-import Lexer from './lexer';
+import {Token, TokenType} from '../token';
+import Lexer from '../lexer';
 
 describe('lexer', () => {
   it('should get next token from string - basic chars', () => {

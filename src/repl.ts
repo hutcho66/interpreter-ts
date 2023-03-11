@@ -1,7 +1,7 @@
 import prompt from 'prompt-sync';
 import history from 'prompt-sync-history';
-import Lexer from '../lexer/lexer';
-import {TokenType} from '../token/token';
+import Lexer from './lexer';
+import {TokenType} from './token';
 
 const PROMPT = '>> ';
 const prompter = prompt({
