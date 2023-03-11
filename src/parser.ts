@@ -1,6 +1,6 @@
 import Lexer from './lexer';
 import {Token, TokenType} from './token';
-import {CallExpression} from './ast';
+import {CallExpression, StringLiteral} from './ast';
 import {
   BooleanLiteral,
   IfExpression,
@@ -63,6 +63,7 @@ export default class Parser {
     this.prefixParsingFunctions = {
       [TokenType.IDENT]: this.parseIdentifier,
       [TokenType.INT]: this.parseIntegerLiteral,
+      [TokenType.STRING]: this.parseStringLiteral,
       [TokenType.MINUS]: this.parsePrefixExpression,
       [TokenType.BANG]: this.parsePrefixExpression,
       [TokenType.TRUE]: this.parseBooleanLiteral,
@@ -108,6 +109,12 @@ export default class Parser {
   private parseIntegerLiteral = () => {
     const value = Number(this.currentToken.literal);
     return new IntegerLiteral(this.currentToken, value);
+  };
+
+  // parse an string literal - must be arrow function to retain this context
+  private parseStringLiteral = () => {
+    const value = this.currentToken.literal;
+    return new StringLiteral(this.currentToken, value);
   };
 
   // parse a boolean literal - must be arrow function to retain this context
@@ -216,7 +223,13 @@ export default class Parser {
     const prefixFunction = this.prefixParsingFunctions[this.currentToken.type];
     if (prefixFunction === undefined) {
       this.errors.push(
-        `ParsingError: no prefix parsing function found for ${this.currentToken.type}`
+        `ParsingError: no prefix parsing function found for ${
+          this.currentToken.type
+        }${
+          this.currentToken.type === TokenType.ILLEGAL
+            ? ' ' + this.currentToken.literal
+            : ''
+        }`
       );
       return null;
     }

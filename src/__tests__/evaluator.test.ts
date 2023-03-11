@@ -1,7 +1,7 @@
 import Lexer from '../lexer';
 import Parser from '../parser';
 import {evaluate} from '../evaluate';
-import {FunctionObj} from '../object';
+import {FunctionObj, StringObj} from '../object';
 import {
   Obj,
   IntegerObj,
@@ -34,6 +34,10 @@ describe('evaluator', () => {
       {input: '5 + true; 5;', message: 'type mismatch: INTEGER + BOOLEAN'},
       {input: '-true;', message: 'unknown operator: -BOOLEAN'},
       {input: 'true + false;', message: 'unknown operator: BOOLEAN + BOOLEAN'},
+      {
+        input: '"hello" - "world";',
+        message: 'unknown operator: STRING - STRING',
+      },
       {
         input: '5; true + false; 5',
         message: 'unknown operator: BOOLEAN + BOOLEAN',
@@ -76,6 +80,22 @@ describe('evaluator', () => {
 
     for (const test of tests) {
       const evaluated = testEvaluate(test.input) as IntegerObj;
+      expect(evaluated.value).toBe(test.expected);
+    }
+  });
+
+  it('should evaluate string literals', () => {
+    const tests = [
+      {input: '"hello world"', expected: 'hello world'},
+      {input: '"hello" + " " + "world"', expected: 'hello world'},
+      {input: '"hello" == "hello"', expected: true},
+      {input: '"hello" != "hello"', expected: false},
+      {input: '"hello" == "world"', expected: false},
+      {input: '"hello" != "world"', expected: true},
+    ];
+
+    for (const test of tests) {
+      const evaluated = testEvaluate(test.input) as StringObj;
       expect(evaluated.value).toBe(test.expected);
     }
   });
@@ -217,5 +237,28 @@ describe('evaluator', () => {
 
     const evaluated = testEvaluate(input) as IntegerObj;
     expect(evaluated.value).toBe(4);
+  });
+
+  it('should evaluate builtins', () => {
+    const tests = [
+      {input: 'len("");', expected: 0},
+      {input: 'len("four");', expected: 4},
+      {input: 'len("hello world");', expected: 11},
+      {input: 'len(1);', expected: "argument INTEGER to 'len' not supported"},
+      {
+        input: 'len("one", "two");',
+        expected: 'invalid number of arguments for `len`',
+      },
+    ];
+
+    for (const test of tests) {
+      const evaluated = testEvaluate(test.input);
+      if (evaluated instanceof ErrorObj) {
+        expect(evaluated.message).toBe(test.expected);
+      } else {
+        const evaluatedInt = evaluated as IntegerObj;
+        expect(evaluatedInt.value).toBe(test.expected);
+      }
+    }
   });
 });

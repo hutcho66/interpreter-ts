@@ -76,6 +76,9 @@ export default class Lexer {
         case '}':
           yield new Token(TokenType.RBRACE, char);
           break;
+        case '"':
+          yield new Token(TokenType.STRING, this.readString());
+          break;
         default:
           if (this.isLetter(char)) {
             const literal = this.readIdentifier();
@@ -126,6 +129,19 @@ export default class Lexer {
 
     this.iteratorIndex--; // move index back to point at last char of identifier
     return this.input.substring(start, this.iteratorIndex + 1);
+  }
+
+  // consume chars to find an string,
+  // leave index pointing at last char of string (closing ") so
+  // that progressing the index doesn't skip a char
+  private readString() {
+    const start = this.iteratorIndex + 1; // don't include opening quote
+    let char = this.input[this.iteratorIndex];
+    do {
+      char = this.input[++this.iteratorIndex];
+    } while (char !== '"');
+
+    return this.input.substring(start, this.iteratorIndex);
   }
 
   // consume chars to find an number,

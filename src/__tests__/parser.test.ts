@@ -23,6 +23,7 @@ describe('parser', () => {
     const tests = [
       {input: 'let x 5;', error: /expected =, got INT/},
       {input: 'let 5;', error: /expected IDENT, got INT/},
+      {input: '~5;', error: /no prefix parsing function found for ILLEGAL ~/},
       {input: '+5;', error: /no prefix parsing function found for \+/},
       {input: '!let', error: /no prefix parsing function found for LET/},
       {
@@ -110,6 +111,23 @@ describe('parser', () => {
     const expression = statement.value as IntegerLiteral;
     expect(expression.value).toBe(5);
     expect(expression.tokenLiteral()).toBe('5');
+  });
+
+  it('should parse string expressions', () => {
+    const input = '"hello world";';
+
+    const lexer = new Lexer(input);
+    const parser = new Parser(lexer);
+
+    const program = parser.parseProgram();
+
+    expect(parser.errors).toHaveLength(0);
+    expect(program.statements).toHaveLength(1);
+
+    const statement = program.statements[0] as ExpressionStatement;
+    const expression = statement.value as IntegerLiteral;
+    expect(expression.value).toBe('hello world');
+    expect(expression.tokenLiteral()).toBe('hello world');
   });
 
   it('should parse boolean literals', () => {

@@ -42,7 +42,9 @@ describe('lexer', () => {
         return false;
       }
       let eq = 10 == 10;
-      let neq = 10 != 9;`;
+      let neq = 10 != 9;
+      "foobar"
+      "foo bar"`;
     const expectedTokens: Token[] = [
       {type: TokenType.LET, literal: 'let'},
       {type: TokenType.IDENT, literal: 'five'},
@@ -111,6 +113,8 @@ describe('lexer', () => {
       {type: TokenType.NEQ, literal: '!='},
       {type: TokenType.INT, literal: '9'},
       {type: TokenType.SEMICOLON, literal: ';'},
+      {type: TokenType.STRING, literal: 'foobar'},
+      {type: TokenType.STRING, literal: 'foo bar'},
       {type: TokenType.EOF, literal: ''},
     ];
     const lexer = new Lexer(input);

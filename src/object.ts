@@ -1,11 +1,14 @@
 import {Identifier, BlockStatement} from './ast';
+
 export const enum ObjectType {
   NULL_OBJ = 'NULL',
   INTEGER_OBJ = 'INTEGER',
+  STRING_OBJ = 'STRING',
   BOOLEAN_OBJ = 'BOOLEAN',
   RETURN_VALUE_OBJ = 'RETURN_VALUE',
-  ERROR_OBJ = 'ERROR_OBJ',
-  FUNCTION_OBJ = 'FUNCTION_OBJ',
+  ERROR_OBJ = 'ERROR',
+  FUNCTION_OBJ = 'FUNCTION',
+  BUILTIN_OBJ = 'BUILTIN',
 }
 
 export class Environment {
@@ -36,6 +39,8 @@ export class Environment {
   }
 }
 
+export type BuiltinFunction = (args: Obj[]) => Obj;
+
 export interface Obj {
   type: () => ObjectType;
   inspect: () => string;
@@ -51,6 +56,12 @@ export class BooleanObj implements Obj {
   constructor(public value: boolean) {}
   type = () => ObjectType.BOOLEAN_OBJ;
   inspect = () => `${this.value}`;
+}
+
+export class StringObj implements Obj {
+  constructor(public value: string) {}
+  type = () => ObjectType.STRING_OBJ;
+  inspect = () => this.value;
 }
 
 export class NullObj implements Obj {
@@ -83,4 +94,10 @@ export class FunctionObj implements Obj {
       .map(p => p.string())
       .join(', ')})) {\n${this.body.string()}\n}`;
   };
+}
+
+export class BuiltinObj implements Obj {
+  constructor(public func: BuiltinFunction) {}
+  type = () => ObjectType.BUILTIN_OBJ;
+  inspect = () => 'builtin function';
 }

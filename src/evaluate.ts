@@ -14,8 +14,19 @@ import {
   ObjectType,
   ReturnValueObj,
 } from './object';
-import {ReturnStatement, Identifier, CallExpression} from './ast';
-import {ErrorObj, Environment, FunctionObj} from './object';
+import {
+  ReturnStatement,
+  Identifier,
+  CallExpression,
+  StringLiteral,
+} from './ast';
+import {
+  ErrorObj,
+  Environment,
+  FunctionObj,
+  StringObj,
+  BuiltinObj,
+} from './object';
 import {
   Expression,
   BooleanLiteral,
@@ -42,6 +53,17 @@ function getIntegerObject(value: number) {
 }
 
 const NULL = new NullObj();
+
+const BUILTINS: {[key: string]: BuiltinObj} = {
+  len: new BuiltinObj((args: Obj[]) => {
+    if (args.length !== 1)
+      return new ErrorObj('invalid number of arguments for `len`');
+    const arg = args[0];
+    if (arg instanceof StringObj) return getIntegerObject(arg.value.length);
+
+    return new ErrorObj(`argument ${arg.type()} to 'len' not supported`);
+  }),
+};
 
 export function evaluate(node: Node, env: Environment): Obj {
   if (node instanceof Program) {
@@ -108,6 +130,10 @@ export function evaluate(node: Node, env: Environment): Obj {
     return getIntegerObject(node.value);
   }
 
+  if (node instanceof StringLiteral) {
+    return new StringObj(node.value);
+  }
+
   if (node instanceof BooleanLiteral) {
     return node.value ? BOOLEANS.TRUE : BOOLEANS.FALSE;
   }
@@ -151,11 +177,12 @@ function evaluateBlockStatement(block: BlockStatement, env: Environment): Obj {
 
 function evaluateIdentifier(node: Identifier, env: Environment): Obj {
   const value = env.get(node.value);
-  if (!value) {
-    return new ErrorObj(`identifier not found: ${node.value}`);
-  }
+  if (value) return value;
 
-  return value;
+  const builtin = BUILTINS[node.value];
+  if (builtin) return builtin;
+
+  return new ErrorObj(`identifier not found: ${node.value}`);
 }
 
 function evaluateExpressions(
@@ -184,21 +211,25 @@ function evaluatePrefixExpression(operator: string, right: Obj): Obj {
 }
 
 function applyFunction(func: Obj, args: Obj[]): Obj {
-  if (!(func instanceof FunctionObj)) {
-    return new ErrorObj(`not a function: ${func.type()}`);
+  if (func instanceof FunctionObj) {
+    const enclosingEnv = Environment.enclosedEnv(func.env);
+    for (const idx in func.parameters) {
+      enclosingEnv.set(func.parameters[idx].value, args[idx]);
+    }
+
+    const evaluated = evaluate(func.body, enclosingEnv);
+    if (evaluated instanceof ReturnValueObj) {
+      return evaluated.returnValue;
+    } else {
+      return evaluated;
+    }
   }
 
-  const enclosingEnv = Environment.enclosedEnv(func.env);
-  for (const idx in func.parameters) {
-    enclosingEnv.set(func.parameters[idx].value, args[idx]);
+  if (func instanceof BuiltinObj) {
+    return func.func(args);
   }
 
-  const evaluated = evaluate(func.body, enclosingEnv);
-  if (evaluated instanceof ReturnValueObj) {
-    return evaluated.returnValue;
-  } else {
-    return evaluated;
-  }
+  return new ErrorObj(`not a function: ${func.type()}`);
 }
 
 function isTruthy(obj: Obj) {
@@ -230,6 +261,13 @@ function evaluateInfixExpression(operator: string, left: Obj, right: Obj): Obj {
     return new ErrorObj(
       `type mismatch: ${left.type()} ${operator} ${right.type()}`
     );
+  }
+
+  if (
+    left.type() === ObjectType.STRING_OBJ &&
+    right.type() === ObjectType.STRING_OBJ
+  ) {
+    return evaluateStringInfixExpression(operator, left, right);
   }
 
   if (
@@ -280,6 +318,28 @@ function evaluateIntegerInfixExpression(
       return leftValue < rightValue ? BOOLEANS.TRUE : BOOLEANS.FALSE;
     case '>':
       return leftValue > rightValue ? BOOLEANS.TRUE : BOOLEANS.FALSE;
+    default:
+      return new ErrorObj(
+        `unknown operator: ${left.type()} ${operator} ${right.type()}`
+      );
+  }
+}
+
+function evaluateStringInfixExpression(
+  operator: string,
+  left: Obj,
+  right: Obj
+): Obj {
+  const leftValue = (<StringObj>left).value;
+  const rightValue = (<StringObj>right).value;
+
+  switch (operator) {
+    case '==':
+      return leftValue === rightValue ? BOOLEANS.TRUE : BOOLEANS.FALSE;
+    case '!=':
+      return leftValue !== rightValue ? BOOLEANS.TRUE : BOOLEANS.FALSE;
+    case '+':
+      return new StringObj(leftValue + rightValue);
     default:
       return new ErrorObj(
         `unknown operator: ${left.type()} ${operator} ${right.type()}`

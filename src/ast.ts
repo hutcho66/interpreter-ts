@@ -121,6 +121,20 @@ export class IntegerLiteral implements Expression {
   }
 }
 
+// An string literal is an expression that returns the string
+export class StringLiteral implements Expression {
+  type = 'expression' as const;
+  constructor(public token: Token, public value: string) {}
+
+  tokenLiteral() {
+    return this.token.literal;
+  }
+
+  string() {
+    return this.token.literal;
+  }
+}
+
 // An boolean literal is an expression that returns a boolean
 export class BooleanLiteral implements Expression {
   type = 'expression' as const;
