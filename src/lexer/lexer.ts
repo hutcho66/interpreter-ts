@@ -10,7 +10,7 @@ export default class Lexer {
 
   nextToken(): Token {
     const result = this.tokenIterator.next();
-    if (!result.value) return {type: TokenType.EOF, literal: ''};
+    if (!result.value) return new Token(TokenType.EOF, '');
 
     return result.value;
   }
@@ -26,68 +26,65 @@ export default class Lexer {
       switch (char) {
         case '=':
           if (this.peekChar() === '=') {
-            yield {type: TokenType.EQ, literal: '=='};
+            yield new Token(TokenType.EQ, '==');
             this.readChar(); // need to eat the extra char
           } else {
-            yield {type: TokenType.ASSIGN, literal: char};
+            yield new Token(TokenType.ASSIGN, char);
           }
           break;
         case '!':
           if (this.peekChar() === '=') {
-            yield {type: TokenType.NEQ, literal: '!='};
+            yield new Token(TokenType.NEQ, '!=');
             this.readChar(); // need to eat the extra char
           } else {
-            yield {type: TokenType.BANG, literal: char};
+            yield new Token(TokenType.BANG, char);
           }
           break;
         case ';':
-          yield {type: TokenType.SEMICOLON, literal: char};
+          yield new Token(TokenType.SEMICOLON, char);
           break;
         case '(':
-          yield {type: TokenType.LPAREN, literal: char};
+          yield new Token(TokenType.LPAREN, char);
           break;
         case ')':
-          yield {type: TokenType.RPAREN, literal: char};
+          yield new Token(TokenType.RPAREN, char);
           break;
         case ',':
-          yield {type: TokenType.COMMA, literal: char};
+          yield new Token(TokenType.COMMA, char);
           break;
         case '+':
-          yield {type: TokenType.PLUS, literal: char};
+          yield new Token(TokenType.PLUS, char);
           break;
         case '-':
-          yield {type: TokenType.MINUS, literal: char};
+          yield new Token(TokenType.MINUS, char);
           break;
         case '*':
-          yield {type: TokenType.ASTERISK, literal: char};
+          yield new Token(TokenType.ASTERISK, char);
           break;
         case '/':
-          yield {type: TokenType.SLASH, literal: char};
+          yield new Token(TokenType.SLASH, char);
           break;
         case '<':
-          yield {type: TokenType.LT, literal: char};
+          yield new Token(TokenType.LT, char);
           break;
         case '>':
-          yield {type: TokenType.GT, literal: char};
+          yield new Token(TokenType.GT, char);
           break;
         case '{':
-          yield {type: TokenType.LBRACE, literal: char};
+          yield new Token(TokenType.LBRACE, char);
           break;
         case '}':
-          yield {type: TokenType.RBRACE, literal: char};
+          yield new Token(TokenType.RBRACE, char);
           break;
         default:
           if (this.isLetter(char)) {
             const literal = this.readIdentifier();
-            yield {
-              type: lookupIdentifier(literal),
-              literal,
-            };
+            yield new Token(lookupIdentifier(literal), literal);
           } else if (this.isDigit(char)) {
             const literal = this.readNumber();
-            yield {type: TokenType.INT, literal};
+            yield new Token(TokenType.INT, literal);
           } else {
-            yield {type: TokenType.ILLEGAL, literal: char};
+            yield new Token(TokenType.ILLEGAL, char);
           }
       }
 

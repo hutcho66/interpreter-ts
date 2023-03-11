@@ -1,4 +1,4 @@
-export enum TokenType {
+export const enum TokenType {
   ILLEGAL = 'ILLEGAL',
   EOF = 'EOF',
 
@@ -39,9 +39,8 @@ export enum TokenType {
   RETURN = 'RETURN',
 }
 
-export interface Token {
-  type: TokenType;
-  literal: string;
+export class Token {
+  constructor(public type: TokenType, public literal: string) {}
 }
 
 const keywords: {[keyword: string]: TokenType} = {
