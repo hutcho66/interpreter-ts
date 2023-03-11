@@ -14,6 +14,6 @@ describe('ast', () => {
       ),
     ]);
 
-    expect(program.string()).toBe('let myVar = anotherVar;return myVar;');
+    expect(program.string()).toBe('let myVar = anotherVar; return myVar;');
   });
 });

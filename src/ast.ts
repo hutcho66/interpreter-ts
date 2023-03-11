@@ -29,7 +29,7 @@ export class Program implements Node {
   }
 
   string() {
-    return this.statements.map(s => s.string()).join('');
+    return this.statements.map(s => s.string()).join(' ');
   }
 }
 
@@ -75,7 +75,7 @@ export class ExpressionStatement implements Statement {
   }
 
   string() {
-    return `${this.value.string()}`;
+    return `${this.value.string()};`;
   }
 }
 

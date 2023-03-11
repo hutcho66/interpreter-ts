@@ -1,7 +1,7 @@
 import prompt from 'prompt-sync';
 import history from 'prompt-sync-history';
 import Lexer from './lexer';
-import {TokenType} from './token';
+import Parser from './parser';
 
 const PROMPT = '>> ';
 const prompter = prompt({
@@ -15,10 +15,16 @@ export default function start() {
   while (true) {
     const input = prompter(PROMPT);
     const lexer = new Lexer(input);
-    let token;
-    do {
-      token = lexer.nextToken();
-      console.log(`{type: ${token.type}, literal: ${token.literal}}`);
-    } while (token.type !== TokenType.EOF);
+    const parser = new Parser(lexer);
+    const program = parser.parseProgram();
+    if (parser.errors.length > 0) {
+      console.log('Error parsing statement:');
+      for (const error of parser.errors) {
+        console.log(`\t${error}`);
+      }
+      continue;
+    }
+
+    console.log(program.string());
   }
 }
