@@ -2,6 +2,8 @@ import prompt from 'prompt-sync';
 import history from 'prompt-sync-history';
 import Lexer from './lexer';
 import Parser from './parser';
+import {evaluate} from './evaluate';
+import {Environment, NullObj} from './object';
 
 const PROMPT = '>> ';
 const prompter = prompt({
@@ -11,6 +13,8 @@ const prompter = prompt({
 });
 
 export default function start() {
+  const env = new Environment();
+
   // eslint-disable-next-line no-constant-condition
   while (true) {
     const input = prompter(PROMPT);
@@ -25,6 +29,10 @@ export default function start() {
       continue;
     }
 
-    console.log(program.string());
+    const evaluated = evaluate(program, env);
+    if (evaluated instanceof NullObj) {
+      continue;
+    }
+    console.log(evaluated.inspect());
   }
 }

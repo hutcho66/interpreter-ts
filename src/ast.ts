@@ -1,5 +1,5 @@
 import {Token} from './token';
-interface Node {
+export interface Node {
   // All nodes must have a function that returns a literal value
   tokenLiteral: () => string;
   string: () => string;
