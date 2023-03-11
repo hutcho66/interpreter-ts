@@ -12,65 +12,62 @@ import {
 
 describe('parser', () => {
   it('should skip invalid statements', () => {
-    const input = `let x 5;
-    let 5;
-    +5;
-    !let;`;
+    const tests = [
+      {input: 'let x 5;', error: /expected =, got INT/},
+      {input: 'let 5;', error: /expected IDENT, got INT/},
+      {input: '+5;', error: /no prefix parsing function found for \+/},
+      {input: '!let', error: /no prefix parsing function found for LET/},
+      {
+        input: 'let x = let',
+        error: /no prefix parsing function found for LET/,
+      },
+      {
+        input: 'return +',
+        error: /no prefix parsing function found for \+/,
+      },
+    ];
 
-    const lexer = new Lexer(input);
-    const parser = new Parser(lexer);
+    for (const test of tests) {
+      const lexer = new Lexer(test.input);
+      const parser = new Parser(lexer);
+      parser.parseProgram();
 
-    parser.parseProgram();
-
-    expect(parser.errors).toHaveLength(4);
-    expect(parser.errors[0]).toMatch(/expected =, got INT/);
-    expect(parser.errors[1]).toMatch(/expected IDENT, got INT/);
-    expect(parser.errors[2]).toMatch(/no prefix parsing function found for \+/);
-    expect(parser.errors[3]).toMatch(
-      /no prefix parsing function found for LET/
-    );
+      expect(parser.errors).toHaveLength(1);
+      expect(parser.errors[0]).toMatch(test.error);
+    }
   });
 
   it('should parse let statements', () => {
-    const input = `let x = 5;
-      let y = 10;
-      let foobar = 838383;`;
+    const input = 'let x = 5;';
 
     const lexer = new Lexer(input);
     const parser = new Parser(lexer);
 
     const program = parser.parseProgram();
 
-    expect(program.statements).toHaveLength(3);
+    expect(program.statements).toHaveLength(1);
     expect(parser.errors).toHaveLength(0);
 
-    const expectedIdentifiers = ['x', 'y', 'foobar'];
-    for (const index in expectedIdentifiers) {
-      const statement = program.statements[index] as LetStatement;
-      expect(statement.tokenLiteral()).toBe('let');
-      expect(statement.name.value).toBe(expectedIdentifiers[index]);
-      expect(statement.name.tokenLiteral()).toBe(expectedIdentifiers[index]);
-    }
+    const statement = program.statements[0] as LetStatement;
+    expect(statement.tokenLiteral()).toBe('let');
+    expect(statement.name.tokenLiteral()).toBe('x');
+    expect(statement.value.tokenLiteral()).toBe('5');
   });
 
   it('should parse return statements', () => {
-    const input = `return 5;
-      return 10;
-      return 838383;`;
+    const input = 'return 5;';
 
     const lexer = new Lexer(input);
     const parser = new Parser(lexer);
 
     const program = parser.parseProgram();
 
-    expect(program.statements).toHaveLength(3);
+    expect(program.statements).toHaveLength(1);
     expect(parser.errors).toHaveLength(0);
 
-    const expectedReturnValues = ['5', '10', '838383'];
-    for (const index in expectedReturnValues) {
-      const statement = program.statements[index] as ReturnStatement;
-      expect(statement.tokenLiteral()).toBe('return');
-    }
+    const statement = program.statements[0] as ReturnStatement;
+    expect(statement.tokenLiteral()).toBe('return');
+    expect(statement.value.tokenLiteral()).toBe('5');
   });
 
   it('should parse identifier expressions', () => {
