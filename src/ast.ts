@@ -29,12 +29,7 @@ export class Program implements Node {
   }
 
   string() {
-    const statementStrings = [];
-    for (const statement of this.statements) {
-      statementStrings.push(statement.string());
-    }
-
-    return statementStrings.join('\n');
+    return this.statements.map(s => s.string()).join('');
   }
 }
 
@@ -84,6 +79,20 @@ export class ExpressionStatement implements Statement {
   }
 }
 
+// An block statement is an array of statements
+export class BlockStatement implements Statement {
+  type = 'statement' as const;
+  constructor(public token: Token, public statements: Statement[]) {}
+
+  tokenLiteral() {
+    return this.token.literal;
+  }
+
+  string() {
+    return this.statements.map(s => s.string()).join('');
+  }
+}
+
 // An identifier is an expression that returns itself
 export class Identifier implements Expression {
   type = 'expression' as const;
@@ -102,6 +111,20 @@ export class Identifier implements Expression {
 export class IntegerLiteral implements Expression {
   type = 'expression' as const;
   constructor(public token: Token, public value: number) {}
+
+  tokenLiteral() {
+    return this.token.literal;
+  }
+
+  string() {
+    return this.token.literal;
+  }
+}
+
+// An boolean literal is an expression that returns a boolean
+export class BooleanLiteral implements Expression {
+  type = 'expression' as const;
+  constructor(public token: Token, public value: boolean) {}
 
   tokenLiteral() {
     return this.token.literal;
@@ -146,5 +169,71 @@ export class InfixExpression implements Expression {
 
   string() {
     return `(${this.left.string()} ${this.operator} ${this.right.string()})`;
+  }
+}
+
+// An if expression has a condition expression and a consequence and alternative block statement
+export class IfExpression implements Expression {
+  type = 'expression' as const;
+  constructor(
+    public token: Token,
+    public condition: Expression,
+    public consequence: BlockStatement,
+    public alternative?: BlockStatement
+  ) {}
+
+  tokenLiteral() {
+    return this.token.literal;
+  }
+
+  string() {
+    let s = `if ${this.condition.string()} ${this.consequence.string()}`;
+    if (this.alternative) s += ` else ${this.alternative.string()}`;
+
+    return s;
+  }
+}
+
+// An function literal has a list of parameters and a body
+export class FunctionLiteral implements Expression {
+  type = 'expression' as const;
+  constructor(
+    public token: Token,
+    public parameters: Identifier[],
+    public body: BlockStatement
+  ) {}
+
+  tokenLiteral() {
+    return this.token.literal;
+  }
+
+  string() {
+    let s = `${this.token.literal} (`;
+    s += this.parameters.map(param => param.string());
+    s += `) ${this.body.string()}`;
+
+    return s;
+  }
+}
+
+// An call literal has an expression returning a function and a list of arguments
+export class CallExpression implements Expression {
+  type = 'expression' as const;
+  constructor(
+    public token: Token,
+    public func: Expression,
+    public args: Expression[]
+  ) {}
+
+  tokenLiteral() {
+    return this.token.literal;
+  }
+
+  string() {
+    let s = `${this.func.string()}(`;
+    s += this.args.map(arg => arg.string()).join(', ');
+    s += ')';
+
+    return s;
   }
 }

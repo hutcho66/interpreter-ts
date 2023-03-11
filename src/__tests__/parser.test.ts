@@ -1,5 +1,13 @@
 import Lexer from '../lexer';
 import Parser from '../parser';
+import {CallExpression} from '../ast';
+import {
+  BooleanLiteral,
+  Expression,
+  IfExpression,
+  BlockStatement,
+  FunctionLiteral,
+} from '../ast';
 import {
   LetStatement,
   ReturnStatement,
@@ -104,10 +112,33 @@ describe('parser', () => {
     expect(expression.tokenLiteral()).toBe('5');
   });
 
+  it('should parse boolean literals', () => {
+    const tests = [
+      {input: 'true;', value: true},
+      {input: 'false;', value: false},
+    ];
+
+    for (const test of tests) {
+      const lexer = new Lexer(test.input);
+      const parser = new Parser(lexer);
+      const program = parser.parseProgram();
+
+      expect(parser.errors).toHaveLength(0);
+      expect(program.statements).toHaveLength(1);
+
+      const statement = program.statements[0] as ExpressionStatement;
+      const expression = statement.value as BooleanLiteral;
+      expect(expression.tokenLiteral()).toBe(`${test.value}`);
+      expect(expression.value).toBe(test.value);
+    }
+  });
+
   it('should parse prefix expressions', () => {
     const tests = [
       {input: '!5;', operator: '!', right: 5},
       {input: '-15;', operator: '-', right: 15},
+      {input: '!true;', operator: '!', right: true},
+      {input: '!false;', operator: '!', right: false},
     ];
 
     for (const test of tests) {
@@ -120,9 +151,8 @@ describe('parser', () => {
 
       const statement = program.statements[0] as ExpressionStatement;
       const expression = statement.value as PrefixExpression;
-      const right = expression.right as IntegerLiteral;
+      const right = expression.right as Expression;
       expect(expression.operator).toBe(test.operator);
-      expect(right.value).toBe(test.right);
       expect(right.tokenLiteral()).toBe(`${test.right}`);
     }
   });
@@ -137,6 +167,9 @@ describe('parser', () => {
       {input: '5 < 5;', operator: '<', left: 5, right: 5},
       {input: '5 == 5;', operator: '==', left: 5, right: 5},
       {input: '5 != 5;', operator: '!=', left: 5, right: 5},
+      {input: 'true == true;', operator: '==', left: true, right: true},
+      {input: 'true != false;', operator: '!=', left: true, right: false},
+      {input: 'false == false;', operator: '==', left: false, right: false},
     ];
 
     for (const test of tests) {
@@ -149,12 +182,10 @@ describe('parser', () => {
 
       const statement = program.statements[0] as ExpressionStatement;
       const expression = statement.value as InfixExpression;
-      const left = expression.left as IntegerLiteral;
-      const right = expression.right as IntegerLiteral;
+      const left = expression.left as Expression;
+      const right = expression.right as Expression;
       expect(expression.operator).toBe(test.operator);
-      expect(left.value).toBe(test.left);
       expect(left.tokenLiteral()).toBe(`${test.left}`);
-      expect(right.value).toBe(test.right);
       expect(right.tokenLiteral()).toBe(`${test.right}`);
     }
   });
@@ -172,12 +203,30 @@ describe('parser', () => {
         input: 'a + b * c + d / e - f',
         expected: '(((a + (b * c)) + (d / e)) - f)',
       },
-      {input: '3 + 4; -5 * 5', expected: '(3 + 4)\n((-5) * 5)'},
+      {input: '3 + 4; -5 * 5', expected: '(3 + 4)((-5) * 5)'},
       {input: '5 > 4 == 3 < 4', expected: '((5 > 4) == (3 < 4))'},
       {input: '5 > 4 != 3 < 4', expected: '((5 > 4) != (3 < 4))'},
       {
         input: '3 + 4 * 5 == 3 * 1 + 4 * 5',
         expected: '((3 + (4 * 5)) == ((3 * 1) + (4 * 5)))',
+      },
+      {input: 'true', expected: 'true'},
+      {input: 'false', expected: 'false'},
+      {input: '3 > 5 == false', expected: '((3 > 5) == false)'},
+      {input: '3 < 5 == false', expected: '((3 < 5) == false)'},
+      {input: '1 + (2 + 3) + 4', expected: '((1 + (2 + 3)) + 4)'},
+      {input: '(5 + 5) * 2', expected: '((5 + 5) * 2)'},
+      {input: '2 / (5 + 5)', expected: '(2 / (5 + 5))'},
+      {input: '-(5 + 5)', expected: '(-(5 + 5))'},
+      {input: '!(true == true)', expected: '(!(true == true))'},
+      {input: 'a + add(b * c) + d', expected: '((a + add((b * c))) + d)'},
+      {
+        input: 'add(a, b, 1, 2 * 3, 4 + 5, add(6, 7 * 8))',
+        expected: 'add(a, b, 1, (2 * 3), (4 + 5), add(6, (7 * 8)))',
+      },
+      {
+        input: 'add(a + b + c * d / f + g)',
+        expected: 'add((((a + b) + ((c * d) / f)) + g))',
       },
     ];
 
@@ -186,7 +235,134 @@ describe('parser', () => {
       const parser = new Parser(lexer);
       const program = parser.parseProgram();
 
+      expect(parser.errors).toHaveLength(0);
+
       expect(program.string()).toEqual(test.expected);
     }
+  });
+
+  it('should parse if expressions', () => {
+    const input = 'if (x < y) { x }';
+
+    const lexer = new Lexer(input);
+    const parser = new Parser(lexer);
+
+    const program = parser.parseProgram();
+
+    expect(parser.errors).toHaveLength(0);
+    expect(program.statements).toHaveLength(1);
+
+    const statement = program.statements[0] as ExpressionStatement;
+    const expression = statement.value as IfExpression;
+
+    const condition = expression.condition as InfixExpression;
+    expect(condition.left.tokenLiteral()).toEqual('x');
+    expect(condition.operator).toEqual('<');
+    expect(condition.right.tokenLiteral()).toEqual('y');
+
+    const consequence = expression.consequence as BlockStatement;
+    expect(consequence.statements).toHaveLength(1);
+    expect(consequence.statements[0].tokenLiteral()).toEqual('x');
+  });
+
+  it('should parse if-else expressions', () => {
+    const input = 'if (x < y) { x } else { y }';
+
+    const lexer = new Lexer(input);
+    const parser = new Parser(lexer);
+
+    const program = parser.parseProgram();
+
+    expect(parser.errors).toHaveLength(0);
+    expect(program.statements).toHaveLength(1);
+
+    const statement = program.statements[0] as ExpressionStatement;
+    const expression = statement.value as IfExpression;
+
+    const condition = expression.condition as InfixExpression;
+    expect(condition.left.tokenLiteral()).toEqual('x');
+    expect(condition.operator).toEqual('<');
+    expect(condition.right.tokenLiteral()).toEqual('y');
+
+    const consequence = expression.consequence as BlockStatement;
+    expect(consequence.statements).toHaveLength(1);
+    expect(consequence.statements[0].tokenLiteral()).toEqual('x');
+
+    const alternative = expression.alternative as BlockStatement;
+    expect(alternative.statements).toHaveLength(1);
+    expect(alternative.statements[0].tokenLiteral()).toEqual('y');
+  });
+
+  it('should parse function parameters', () => {
+    const tests = [
+      {input: 'fn() {};', params: []},
+      {input: 'fn(x) {};', params: ['x']},
+      {input: 'fn(x, y, z) {};', params: ['x', 'y', 'z']},
+    ];
+
+    for (const test of tests) {
+      const lexer = new Lexer(test.input);
+      const parser = new Parser(lexer);
+
+      const program = parser.parseProgram();
+
+      expect(parser.errors).toHaveLength(0);
+      expect(program.statements).toHaveLength(1);
+      const expression = program.statements[0] as ExpressionStatement;
+      const fn = expression.value as FunctionLiteral;
+
+      expect(fn.parameters).toHaveLength(test.params.length);
+      for (const i in fn.parameters) {
+        expect(fn.parameters[i].string()).toEqual(test.params[i]);
+      }
+    }
+  });
+
+  it('should parse function literals', () => {
+    const input = 'fn(x, y) { x + y; }';
+
+    const lexer = new Lexer(input);
+    const parser = new Parser(lexer);
+
+    const program = parser.parseProgram();
+
+    expect(parser.errors).toHaveLength(0);
+    expect(program.statements).toHaveLength(1);
+
+    const statement = program.statements[0] as ExpressionStatement;
+    const expression = statement.value as FunctionLiteral;
+
+    const parameters = expression.parameters as Identifier[];
+    expect(parameters).toHaveLength(2);
+    expect(parameters[0].tokenLiteral()).toEqual('x');
+    expect(parameters[1].tokenLiteral()).toEqual('y');
+
+    const body = expression.body as BlockStatement;
+    expect(body.statements).toHaveLength(1);
+    expect(body.statements[0].string()).toEqual('(x + y)');
+  });
+
+  it('should parse call expressions', () => {
+    const input = 'add(1, 2 * 3, 4 + 5)';
+
+    const lexer = new Lexer(input);
+    const parser = new Parser(lexer);
+
+    const program = parser.parseProgram();
+
+    expect(parser.errors).toHaveLength(0);
+    expect(program.statements).toHaveLength(1);
+
+    const statement = program.statements[0] as ExpressionStatement;
+    const expression = statement.value as CallExpression;
+
+    const func = expression.func as Expression;
+    expect(func.string()).toEqual('add');
+
+    const args = expression.args as Expression[];
+    expect(args).toHaveLength(3);
+    expect(args[0].string()).toEqual('1');
+    expect(args[1].string()).toEqual('(2 * 3)');
+    expect(args[2].string()).toEqual('(4 + 5)');
   });
 });
