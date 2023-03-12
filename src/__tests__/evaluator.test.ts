@@ -1,7 +1,7 @@
 import Lexer from '../lexer';
 import Parser from '../parser';
 import {evaluate} from '../evaluate';
-import {FunctionObj, StringObj} from '../object';
+import {FunctionObj, StringObj, ArrayObj} from '../object';
 import {
   Obj,
   IntegerObj,
@@ -241,13 +241,15 @@ describe('evaluator', () => {
 
   it('should evaluate builtins', () => {
     const tests = [
-      {input: 'len("");', expected: 0},
-      {input: 'len("four");', expected: 4},
       {input: 'len("hello world");', expected: 11},
+      {input: 'len([1, 3, 3+3]);', expected: 3},
+      {input: 'last([1, 3, 3+3]);', expected: 6},
+      {input: 'rest([1, 3, 3+3]);', expected: '[3, 6]'},
+      {input: 'push([1, 3], 5);', expected: '[1, 3, 5]'},
       {input: 'len(1);', expected: "argument INTEGER to 'len' not supported"},
       {
         input: 'len("one", "two");',
-        expected: 'invalid number of arguments for `len`',
+        expected: "invalid number of arguments for 'len'",
       },
     ];
 
@@ -255,6 +257,40 @@ describe('evaluator', () => {
       const evaluated = testEvaluate(test.input);
       if (evaluated instanceof ErrorObj) {
         expect(evaluated.message).toBe(test.expected);
+      } else if (evaluated instanceof IntegerObj) {
+        expect(evaluated.value).toBe(test.expected);
+      } else {
+        expect(evaluated.inspect()).toBe(test.expected);
+      }
+    }
+  });
+
+  it('should evaluate array literals', () => {
+    const input = '[1, 2 * 2, 3 + 3]';
+
+    const evaluated = testEvaluate(input) as ArrayObj;
+    expect(evaluated.elements).toHaveLength(3);
+    expect(evaluated.elements[0].inspect()).toBe('1');
+    expect(evaluated.elements[1].inspect()).toBe('4');
+    expect(evaluated.elements[2].inspect()).toBe('6');
+  });
+
+  it('should evaluate index expressions', () => {
+    const tests = [
+      {input: '[1, 2, 3][0]', expected: 1},
+      {input: '[1, 2, 3][1]', expected: 2},
+      {input: '[1, 2, 3][2]', expected: 3},
+      {input: 'let i = 0; [1][i]', expected: 1},
+      {input: '[1, 2, 3][1 + 1]', expected: 3},
+      {input: 'let myArray = [1, 2, 3]; myArray[2];', expected: 3},
+      {input: '[1, 2, 3][3]', expected: undefined},
+      {input: '[1, 2, 3][-1]', expected: undefined},
+    ];
+
+    for (const test of tests) {
+      const evaluated = testEvaluate(test.input);
+      if (test.expected === undefined) {
+        expect(evaluated).toBeInstanceOf(NullObj);
       } else {
         const evaluatedInt = evaluated as IntegerObj;
         expect(evaluatedInt.value).toBe(test.expected);

@@ -1,7 +1,9 @@
 import {Identifier, BlockStatement} from './ast';
 
 export const enum ObjectType {
+  EMPTY_OBJ = 'EMPTY',
   NULL_OBJ = 'NULL',
+  UNDEFINED_OBJ = 'UNDEFINED',
   INTEGER_OBJ = 'INTEGER',
   STRING_OBJ = 'STRING',
   BOOLEAN_OBJ = 'BOOLEAN',
@@ -9,6 +11,7 @@ export const enum ObjectType {
   ERROR_OBJ = 'ERROR',
   FUNCTION_OBJ = 'FUNCTION',
   BUILTIN_OBJ = 'BUILTIN',
+  ARRAY_OBJ = 'ARRAY',
 }
 
 export class Environment {
@@ -61,13 +64,25 @@ export class BooleanObj implements Obj {
 export class StringObj implements Obj {
   constructor(public value: string) {}
   type = () => ObjectType.STRING_OBJ;
-  inspect = () => this.value;
+  inspect = () => `"${this.value}"`;
 }
 
 export class NullObj implements Obj {
   constructor() {}
   type = () => ObjectType.NULL_OBJ;
   inspect = () => 'null';
+}
+
+export class EmptyObj implements Obj {
+  constructor() {}
+  type = () => ObjectType.EMPTY_OBJ;
+  inspect = () => '';
+}
+
+export class UndefinedObj implements Obj {
+  constructor() {}
+  type = () => ObjectType.UNDEFINED_OBJ;
+  inspect = () => 'undefined';
 }
 
 export class ReturnValueObj implements Obj {
@@ -90,14 +105,18 @@ export class FunctionObj implements Obj {
   ) {}
   type = () => ObjectType.FUNCTION_OBJ;
   inspect = () => {
-    return `fn(${this.parameters
-      .map(p => p.string())
-      .join(', ')})) {\n${this.body.string()}\n}`;
+    return '[Function]';
   };
 }
 
 export class BuiltinObj implements Obj {
   constructor(public func: BuiltinFunction) {}
   type = () => ObjectType.BUILTIN_OBJ;
-  inspect = () => 'builtin function';
+  inspect = () => '[Builtin]';
+}
+
+export class ArrayObj implements Obj {
+  constructor(public elements: Obj[]) {}
+  type = () => ObjectType.ARRAY_OBJ;
+  inspect = () => `[${this.elements.map(e => e.inspect()).join(', ')}]`;
 }

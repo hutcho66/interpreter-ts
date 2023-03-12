@@ -1,6 +1,6 @@
 import Lexer from '../lexer';
 import Parser from '../parser';
-import {CallExpression} from '../ast';
+import {CallExpression, ArrayLiteral, IndexExpression} from '../ast';
 import {
   BooleanLiteral,
   Expression,
@@ -246,6 +246,14 @@ describe('parser', () => {
         input: 'add(a + b + c * d / f + g)',
         expected: 'add((((a + b) + ((c * d) / f)) + g));',
       },
+      {
+        input: 'a * [1, 2, 3, 4][b * c] * d',
+        expected: '((a * ([1, 2, 3, 4][(b * c)])) * d);',
+      },
+      {
+        input: 'add(a * b[2], b[1], 2 * [1, 2][1])',
+        expected: 'add((a * (b[2])), (b[1]), (2 * ([1, 2][1])));',
+      },
     ];
 
     for (const test of tests) {
@@ -382,5 +390,44 @@ describe('parser', () => {
     expect(args[0].string()).toEqual('1');
     expect(args[1].string()).toEqual('(2 * 3)');
     expect(args[2].string()).toEqual('(4 + 5)');
+  });
+
+  it('should parse array literals', () => {
+    const input = '[1, 2 * 2, 3 + 3]';
+
+    const lexer = new Lexer(input);
+    const parser = new Parser(lexer);
+
+    const program = parser.parseProgram();
+
+    expect(parser.errors).toHaveLength(0);
+    expect(program.statements).toHaveLength(1);
+
+    const statement = program.statements[0] as ExpressionStatement;
+    const expression = statement.value as ArrayLiteral;
+
+    const elements = expression.elements as Expression[];
+    expect(elements).toHaveLength(3);
+    expect(elements[0].string()).toEqual('1');
+    expect(elements[1].string()).toEqual('(2 * 2)');
+    expect(elements[2].string()).toEqual('(3 + 3)');
+  });
+
+  it('should parse index expressions', () => {
+    const input = 'myArray[1 + 1]';
+
+    const lexer = new Lexer(input);
+    const parser = new Parser(lexer);
+
+    const program = parser.parseProgram();
+
+    expect(parser.errors).toHaveLength(0);
+    expect(program.statements).toHaveLength(1);
+
+    const statement = program.statements[0] as ExpressionStatement;
+    const expression = statement.value as IndexExpression;
+
+    expect(expression.left.string()).toEqual('myArray');
+    expect(expression.index.string()).toEqual('(1 + 1)');
   });
 });

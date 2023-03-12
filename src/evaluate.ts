@@ -1,3 +1,5 @@
+import {ArrayObj} from './object';
+import {IndexExpression} from './ast';
 import {
   Node,
   IntegerLiteral,
@@ -5,15 +7,9 @@ import {
   ExpressionStatement,
   LetStatement,
   FunctionLiteral,
+  ArrayLiteral,
 } from './ast';
-import {
-  Obj,
-  IntegerObj,
-  NullObj,
-  BooleanObj,
-  ObjectType,
-  ReturnValueObj,
-} from './object';
+import {Obj, IntegerObj, ObjectType, ReturnValueObj} from './object';
 import {
   ReturnStatement,
   Identifier,
@@ -35,35 +31,7 @@ import {
   BlockStatement,
   IfExpression,
 } from './ast';
-
-const BOOLEANS = {
-  TRUE: new BooleanObj(true),
-  FALSE: new BooleanObj(false),
-};
-
-const INTEGERS: {[key: number]: IntegerObj} = {};
-function getIntegerObject(value: number) {
-  let lookupInteger = INTEGERS[value];
-  if (!lookupInteger) {
-    lookupInteger = new IntegerObj(value);
-    INTEGERS[value] = lookupInteger;
-  }
-
-  return lookupInteger;
-}
-
-const NULL = new NullObj();
-
-const BUILTINS: {[key: string]: BuiltinObj} = {
-  len: new BuiltinObj((args: Obj[]) => {
-    if (args.length !== 1)
-      return new ErrorObj('invalid number of arguments for `len`');
-    const arg = args[0];
-    if (arg instanceof StringObj) return getIntegerObject(arg.value.length);
-
-    return new ErrorObj(`argument ${arg.type()} to 'len' not supported`);
-  }),
-};
+import {BOOLEAN, BUILTIN, EMPTY, INTEGER, NULL} from './builtins';
 
 export function evaluate(node: Node, env: Environment): Obj {
   if (node instanceof Program) {
@@ -84,6 +52,12 @@ export function evaluate(node: Node, env: Environment): Obj {
     const value = evaluate(node.value, env);
     if (value instanceof ErrorObj) return value;
     env.set(node.name.value, value);
+
+    // Unlike the go implementation, typescript won't allow us
+    // to default to a 'nil' return which means that LET statements
+    // would otherwise return NULL which prints to the REPL
+    // This special object type is explicitly ignored by the REPL
+    return EMPTY;
   }
 
   if (node instanceof Identifier) {
@@ -112,10 +86,6 @@ export function evaluate(node: Node, env: Environment): Obj {
     return evaluateIfExpression(node, env);
   }
 
-  if (node instanceof FunctionLiteral) {
-    return new FunctionObj(node.parameters, node.body, env);
-  }
-
   if (node instanceof CallExpression) {
     const func = evaluate(node.func, env);
     if (func instanceof ErrorObj) return func;
@@ -126,8 +96,18 @@ export function evaluate(node: Node, env: Environment): Obj {
     return applyFunction(func, args);
   }
 
+  if (node instanceof IndexExpression) {
+    const left = evaluate(node.left, env);
+    if (left instanceof ErrorObj) return left;
+
+    const index = evaluate(node.index, env);
+    if (index instanceof ErrorObj) return index;
+
+    return evaluateIndexExpression(left, index);
+  }
+
   if (node instanceof IntegerLiteral) {
-    return getIntegerObject(node.value);
+    return INTEGER(node.value);
   }
 
   if (node instanceof StringLiteral) {
@@ -135,7 +115,17 @@ export function evaluate(node: Node, env: Environment): Obj {
   }
 
   if (node instanceof BooleanLiteral) {
-    return node.value ? BOOLEANS.TRUE : BOOLEANS.FALSE;
+    return node.value ? BOOLEAN.TRUE : BOOLEAN.FALSE;
+  }
+
+  if (node instanceof FunctionLiteral) {
+    return new FunctionObj(node.parameters, node.body, env);
+  }
+
+  if (node instanceof ArrayLiteral) {
+    const elements = evaluateExpressions(node.elements, env);
+    if (elements instanceof ErrorObj) return elements;
+    return new ArrayObj(elements);
   }
 
   return NULL;
@@ -179,7 +169,7 @@ function evaluateIdentifier(node: Identifier, env: Environment): Obj {
   const value = env.get(node.value);
   if (value) return value;
 
-  const builtin = BUILTINS[node.value];
+  const builtin = BUILTIN[node.value];
   if (builtin) return builtin;
 
   return new ErrorObj(`identifier not found: ${node.value}`);
@@ -210,6 +200,24 @@ function evaluatePrefixExpression(operator: string, right: Obj): Obj {
   }
 }
 
+function evaluateIndexExpression(left: Obj, index: Obj): Obj {
+  if (left instanceof ArrayObj && index instanceof IntegerObj) {
+    return evaluateArrayIndexExpression(left, index);
+  }
+
+  return new ErrorObj(`unknown operator for indexing: ${left.type()}`);
+}
+
+function evaluateArrayIndexExpression(array: ArrayObj, index: IntegerObj): Obj {
+  const maxIndex = array.elements.length - 1;
+
+  if (index.value < 0 || index.value > maxIndex) {
+    return NULL;
+  }
+
+  return array.elements[index.value];
+}
+
 function applyFunction(func: Obj, args: Obj[]): Obj {
   if (func instanceof FunctionObj) {
     const enclosingEnv = Environment.enclosedEnv(func.env);
@@ -235,16 +243,16 @@ function applyFunction(func: Obj, args: Obj[]): Obj {
 function isTruthy(obj: Obj) {
   switch (obj) {
     case NULL:
-    case BOOLEANS.FALSE:
+    case BOOLEAN.FALSE:
       return false;
-    case BOOLEANS.TRUE:
+    case BOOLEAN.TRUE:
     default:
       return true;
   }
 }
 
 function evaluateBangExpression(obj: Obj): Obj {
-  return isTruthy(obj) ? BOOLEANS.FALSE : BOOLEANS.TRUE;
+  return isTruthy(obj) ? BOOLEAN.FALSE : BOOLEAN.TRUE;
 }
 
 function evaluateMinusPrefixExpression(obj: Obj): Obj {
@@ -253,7 +261,7 @@ function evaluateMinusPrefixExpression(obj: Obj): Obj {
   }
 
   const value = -(<IntegerObj>obj).value;
-  return getIntegerObject(value);
+  return INTEGER(value);
 }
 
 function evaluateInfixExpression(operator: string, left: Obj, right: Obj): Obj {
@@ -277,8 +285,8 @@ function evaluateInfixExpression(operator: string, left: Obj, right: Obj): Obj {
     return evaluateIntegerInfixExpression(operator, left, right);
   }
 
-  if (operator === '==') return left === right ? BOOLEANS.TRUE : BOOLEANS.FALSE;
-  if (operator === '!=') return left !== right ? BOOLEANS.TRUE : BOOLEANS.FALSE;
+  if (operator === '==') return left === right ? BOOLEAN.TRUE : BOOLEAN.FALSE;
+  if (operator === '!=') return left !== right ? BOOLEAN.TRUE : BOOLEAN.FALSE;
 
   return new ErrorObj(
     `unknown operator: ${left.type()} ${operator} ${right.type()}`
@@ -294,9 +302,9 @@ function evaluateIntegerInfixExpression(
   // this makes integer equivalence faster!
   switch (operator) {
     case '==':
-      return left === right ? BOOLEANS.TRUE : BOOLEANS.FALSE;
+      return left === right ? BOOLEAN.TRUE : BOOLEAN.FALSE;
     case '!=':
-      return left !== right ? BOOLEANS.TRUE : BOOLEANS.FALSE;
+      return left !== right ? BOOLEAN.TRUE : BOOLEAN.FALSE;
     default:
       break;
   }
@@ -307,17 +315,17 @@ function evaluateIntegerInfixExpression(
 
   switch (operator) {
     case '+':
-      return getIntegerObject(leftValue + rightValue);
+      return INTEGER(leftValue + rightValue);
     case '-':
-      return getIntegerObject(leftValue - rightValue);
+      return INTEGER(leftValue - rightValue);
     case '*':
-      return getIntegerObject(leftValue * rightValue);
+      return INTEGER(leftValue * rightValue);
     case '/': // integer division!
-      return getIntegerObject(Math.trunc(leftValue / rightValue));
+      return INTEGER(Math.trunc(leftValue / rightValue));
     case '<':
-      return leftValue < rightValue ? BOOLEANS.TRUE : BOOLEANS.FALSE;
+      return leftValue < rightValue ? BOOLEAN.TRUE : BOOLEAN.FALSE;
     case '>':
-      return leftValue > rightValue ? BOOLEANS.TRUE : BOOLEANS.FALSE;
+      return leftValue > rightValue ? BOOLEAN.TRUE : BOOLEAN.FALSE;
     default:
       return new ErrorObj(
         `unknown operator: ${left.type()} ${operator} ${right.type()}`
@@ -335,9 +343,9 @@ function evaluateStringInfixExpression(
 
   switch (operator) {
     case '==':
-      return leftValue === rightValue ? BOOLEANS.TRUE : BOOLEANS.FALSE;
+      return leftValue === rightValue ? BOOLEAN.TRUE : BOOLEAN.FALSE;
     case '!=':
-      return leftValue !== rightValue ? BOOLEANS.TRUE : BOOLEANS.FALSE;
+      return leftValue !== rightValue ? BOOLEAN.TRUE : BOOLEAN.FALSE;
     case '+':
       return new StringObj(leftValue + rightValue);
     default:

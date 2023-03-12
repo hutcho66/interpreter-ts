@@ -251,3 +251,37 @@ export class CallExpression implements Expression {
     return s;
   }
 }
+
+export class ArrayLiteral implements Expression {
+  type = 'expression' as const;
+  constructor(public token: Token, public elements: Expression[]) {}
+
+  tokenLiteral() {
+    return this.token.literal;
+  }
+
+  string() {
+    const s = `[${this.elements.map(e => e.string()).join(', ')}]`;
+
+    return s;
+  }
+}
+
+export class IndexExpression implements Expression {
+  type = 'expression' as const;
+  constructor(
+    public token: Token,
+    public left: Expression,
+    public index: Expression
+  ) {}
+
+  tokenLiteral() {
+    return this.token.literal;
+  }
+
+  string() {
+    const s = `(${this.left.string()}[${this.index.string()}])`;
+
+    return s;
+  }
+}

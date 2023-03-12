@@ -3,7 +3,7 @@ import history from 'prompt-sync-history';
 import Lexer from './lexer';
 import Parser from './parser';
 import {evaluate} from './evaluate';
-import {Environment, NullObj} from './object';
+import {Environment, EmptyObj} from './object';
 
 const PROMPT = '>> ';
 const prompter = prompt({
@@ -30,7 +30,9 @@ export default function start() {
     }
 
     const evaluated = evaluate(program, env);
-    if (evaluated instanceof NullObj) {
+    if (evaluated instanceof EmptyObj) {
+      // This is a special object returned by LET statements which have
+      // no real return value, even NULL
       continue;
     }
     console.log(evaluated.inspect());

@@ -1,6 +1,11 @@
 import Lexer from './lexer';
 import {Token, TokenType} from './token';
-import {CallExpression, StringLiteral} from './ast';
+import {
+  CallExpression,
+  StringLiteral,
+  ArrayLiteral,
+  IndexExpression,
+} from './ast';
 import {
   BooleanLiteral,
   IfExpression,
@@ -33,6 +38,7 @@ enum Precedence {
   PRODUCT,
   PREFIX,
   CALL,
+  INDEX,
 }
 
 const PrecedenceMap: {[token in TokenType]?: Precedence} = {
@@ -45,6 +51,7 @@ const PrecedenceMap: {[token in TokenType]?: Precedence} = {
   [TokenType.SLASH]: Precedence.PRODUCT,
   [TokenType.ASTERISK]: Precedence.PRODUCT,
   [TokenType.LPAREN]: Precedence.CALL,
+  [TokenType.LBRACKET]: Precedence.INDEX,
 };
 
 export default class Parser {
@@ -69,6 +76,7 @@ export default class Parser {
       [TokenType.TRUE]: this.parseBooleanLiteral,
       [TokenType.FALSE]: this.parseBooleanLiteral,
       [TokenType.LPAREN]: this.parseGroupedExpression,
+      [TokenType.LBRACKET]: this.parseArrayLiteral,
       [TokenType.IF]: this.parseIfExpression,
       [TokenType.FUNCTION]: this.parseFunctionLiteral,
     };
@@ -82,6 +90,7 @@ export default class Parser {
       [TokenType.LT]: this.parseInfixExpression,
       [TokenType.GT]: this.parseInfixExpression,
       [TokenType.LPAREN]: this.parseCallExpression,
+      [TokenType.LBRACKET]: this.parseIndexExpression,
     };
   }
 
@@ -403,42 +412,66 @@ export default class Parser {
   // parse a call expression - must be arrow function to retain this context
   private parseCallExpression = (func: Expression) => {
     const token = this.currentToken;
-    const args = this.parseCallArguments();
+    const args = this.parseExpressionList(TokenType.RPAREN);
     if (args === null) return null;
 
     return new CallExpression(token, func, args);
   };
 
-  // Parse call arguments
-  private parseCallArguments = () => {
-    const args: Expression[] = [];
+  // parse an array literal - must be arrow function to retain this context
+  private parseArrayLiteral = () => {
+    const token = this.currentToken;
+    const elements = this.parseExpressionList(TokenType.RBRACKET);
+    if (elements === null) return null;
 
-    if (this.isPeekToken(TokenType.RPAREN)) {
+    return new ArrayLiteral(token, elements);
+  };
+
+  // Parse call arguments
+  private parseExpressionList = (end: TokenType) => {
+    const list: Expression[] = [];
+
+    if (this.isPeekToken(end)) {
       this.nextToken();
-      return args;
+      return list;
     }
 
     this.nextToken();
 
-    let arg = this.parseExpression(Precedence.LOWEST);
-    if (arg === null) return null;
-    args.push(arg);
+    let exp = this.parseExpression(Precedence.LOWEST);
+    if (exp === null) return null;
+    list.push(exp);
 
     while (this.isPeekToken(TokenType.COMMA)) {
       // move past comma
       this.nextToken();
       this.nextToken();
 
-      arg = this.parseExpression(Precedence.LOWEST);
-      if (arg === null) return null;
-      args.push(arg);
+      exp = this.parseExpression(Precedence.LOWEST);
+      if (exp === null) return null;
+      list.push(exp);
     }
 
-    if (!this.expectNextToken(TokenType.RPAREN)) {
+    if (!this.expectNextToken(end)) {
       return null;
     }
 
-    return args;
+    return list;
+  };
+
+  // parse an index expression - must be arrow function to retain this context
+  private parseIndexExpression = (left: Expression) => {
+    const token = this.currentToken;
+
+    this.nextToken();
+
+    const index = this.parseExpression(Precedence.LOWEST);
+
+    if (index === null || !this.expectNextToken(TokenType.RBRACKET)) {
+      return null;
+    }
+
+    return new IndexExpression(token, left, index);
   };
 
   // Check precedence of next token
