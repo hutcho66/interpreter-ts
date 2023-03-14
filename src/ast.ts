@@ -285,3 +285,26 @@ export class IndexExpression implements Expression {
     return s;
   }
 }
+
+export class HashLiteral implements Expression {
+  type = 'expression' as const;
+  constructor(
+    public token: Token,
+    public pairs: Map<Expression, Expression> // cant use JS object as we are using expressions as keys!
+  ) {}
+
+  tokenLiteral() {
+    return this.token.literal;
+  }
+
+  string() {
+    const strings: string[] = [];
+    this.pairs.forEach((key, value) => {
+      strings.push(`${key.string()}: ${value.string()}`);
+    });
+
+    const s = `{${strings.join(', ')}}`;
+
+    return s;
+  }
+}

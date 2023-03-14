@@ -43,6 +43,9 @@ export default class Lexer {
         case ';':
           yield new Token(TokenType.SEMICOLON, char);
           break;
+        case ':':
+          yield new Token(TokenType.COLON, char);
+          break;
         case '(':
           yield new Token(TokenType.LPAREN, char);
           break;

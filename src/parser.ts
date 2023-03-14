@@ -1,5 +1,6 @@
 import Lexer from './lexer';
 import {Token, TokenType} from './token';
+import {HashLiteral} from './ast';
 import {
   CallExpression,
   StringLiteral,
@@ -77,6 +78,7 @@ export default class Parser {
       [TokenType.FALSE]: this.parseBooleanLiteral,
       [TokenType.LPAREN]: this.parseGroupedExpression,
       [TokenType.LBRACKET]: this.parseArrayLiteral,
+      [TokenType.LBRACE]: this.parseHashLiteral,
       [TokenType.IF]: this.parseIfExpression,
       [TokenType.FUNCTION]: this.parseFunctionLiteral,
     };
@@ -472,6 +474,35 @@ export default class Parser {
     }
 
     return new IndexExpression(token, left, index);
+  };
+
+  // parse a hash literal - must be arrow function to retain this context
+  private parseHashLiteral = () => {
+    const token = this.currentToken;
+    const pairs = new Map<Expression, Expression>();
+
+    while (!this.isPeekToken(TokenType.RBRACE)) {
+      this.nextToken();
+      const key = this.parseExpression(Precedence.LOWEST);
+      if (key === null) return key;
+
+      if (!this.expectNextToken(TokenType.COLON)) return null;
+      this.nextToken();
+      const value = this.parseExpression(Precedence.LOWEST);
+      if (value === null) return value;
+
+      pairs.set(key, value);
+
+      if (
+        !this.isPeekToken(TokenType.RBRACE) &&
+        !this.expectNextToken(TokenType.COMMA)
+      )
+        return null;
+    }
+
+    if (!this.expectNextToken(TokenType.RBRACE)) return null;
+
+    return new HashLiteral(token, pairs);
   };
 
   // Check precedence of next token

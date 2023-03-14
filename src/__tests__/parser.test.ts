@@ -1,6 +1,12 @@
 import Lexer from '../lexer';
 import Parser from '../parser';
-import {CallExpression, ArrayLiteral, IndexExpression} from '../ast';
+import {
+  CallExpression,
+  ArrayLiteral,
+  IndexExpression,
+  HashLiteral,
+  StringLiteral,
+} from '../ast';
 import {
   BooleanLiteral,
   Expression,
@@ -429,5 +435,51 @@ describe('parser', () => {
 
     expect(expression.left.string()).toEqual('myArray');
     expect(expression.index.string()).toEqual('(1 + 1)');
+  });
+
+  it('should parse empty hash literals', () => {
+    const input = '{}';
+
+    const lexer = new Lexer(input);
+    const parser = new Parser(lexer);
+
+    const program = parser.parseProgram();
+
+    expect(parser.errors).toHaveLength(0);
+    expect(program.statements).toHaveLength(1);
+
+    const statement = program.statements[0] as ExpressionStatement;
+    const hash = statement.value as HashLiteral;
+
+    expect(hash.pairs.size).toBe(0);
+  });
+
+  it('should parse hash literals', () => {
+    const input = '{"one": 1, "two": 2, "three": 3}';
+
+    const lexer = new Lexer(input);
+    const parser = new Parser(lexer);
+
+    const program = parser.parseProgram();
+
+    expect(parser.errors).toHaveLength(0);
+    expect(program.statements).toHaveLength(1);
+
+    const statement = program.statements[0] as ExpressionStatement;
+    const hash = statement.value as HashLiteral;
+
+    const expected: {[key: string]: number} = {
+      one: 1,
+      two: 2,
+      three: 3,
+    };
+
+    expect(hash.pairs.size).toBe(3);
+    for (const [key, value] of hash.pairs) {
+      const keyString = (key as StringLiteral).value;
+      const valueInt = (value as IntegerLiteral).value;
+
+      expect(expected[keyString]).toBe(valueInt);
+    }
   });
 });

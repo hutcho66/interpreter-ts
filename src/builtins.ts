@@ -98,12 +98,22 @@ const push = (args: Obj[]) => {
   return new ErrorObj(`argument ${array.type()} to 'push' not supported`);
 };
 
+// print object
+const puts = (args: Obj[]) => {
+  for (const arg of args) {
+    console.log(arg.display());
+  }
+
+  return EMPTY;
+};
+
 const BUILTIN: {[key: string]: BuiltinObj} = {
   len: new BuiltinObj(len),
   first: new BuiltinObj(first),
   last: new BuiltinObj(last),
   rest: new BuiltinObj(rest),
   push: new BuiltinObj(push),
+  puts: new BuiltinObj(puts),
 };
 
 export {BOOLEAN, INTEGER, NULL, EMPTY, BUILTIN};

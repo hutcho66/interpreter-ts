@@ -1,7 +1,7 @@
 import Lexer from '../lexer';
 import Parser from '../parser';
 import {evaluate} from '../evaluate';
-import {FunctionObj, StringObj, ArrayObj} from '../object';
+import {FunctionObj, StringObj, ArrayObj, HashObj, HashKey} from '../object';
 import {
   Obj,
   IntegerObj,
@@ -53,6 +53,10 @@ describe('evaluator', () => {
       {
         input: 'foobar',
         message: 'identifier not found: foobar',
+      },
+      {
+        input: '{"name": "Monkey"}[fn(x) { x }];',
+        message: 'unusable as hash key: FUNCTION',
       },
     ];
 
@@ -285,6 +289,47 @@ describe('evaluator', () => {
       {input: 'let myArray = [1, 2, 3]; myArray[2];', expected: 3},
       {input: '[1, 2, 3][3]', expected: undefined},
       {input: '[1, 2, 3][-1]', expected: undefined},
+    ];
+
+    for (const test of tests) {
+      const evaluated = testEvaluate(test.input);
+      if (test.expected === undefined) {
+        expect(evaluated).toBeInstanceOf(NullObj);
+      } else {
+        const evaluatedInt = evaluated as IntegerObj;
+        expect(evaluatedInt.value).toBe(test.expected);
+      }
+    }
+  });
+
+  it('should evaluate hash literals', () => {
+    const input = `let two = "two";
+    {
+      "one": 10 - 9,
+      two: 1 + 1,
+      3: 3,
+      true: 4
+    }`;
+
+    const evaluated = testEvaluate(input) as HashObj;
+    const expected: Map<HashKey, number> = new Map<HashKey, number>();
+    expected.set(new StringObj('one').hash(), 1);
+    expected.set(new StringObj('two').hash(), 2);
+    expected.set(new IntegerObj(3).hash(), 3);
+    expected.set(new BooleanObj(true).hash(), 4);
+
+    expected.forEach((expectedValue, key) => {
+      expect(evaluated.pairs.get(key)?.value.inspect()).toBe(
+        expectedValue.toString()
+      );
+    });
+  });
+
+  it('should evaluate hash index expressions', () => {
+    const tests = [
+      {input: '{"foo": 5}["foo"]', expected: 5},
+      {input: '{"foo": 5}["bar"]', expected: undefined},
+      {input: 'let key = "foo"; {"foo": 5}[key]', expected: 5},
     ];
 
     for (const test of tests) {

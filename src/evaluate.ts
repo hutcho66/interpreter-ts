@@ -1,5 +1,5 @@
-import {ArrayObj} from './object';
-import {IndexExpression} from './ast';
+import {ArrayObj, HashKey, HashPair, Hashable, HashObj} from './object';
+import {IndexExpression, HashLiteral} from './ast';
 import {
   Node,
   IntegerLiteral,
@@ -128,6 +128,10 @@ export function evaluate(node: Node, env: Environment): Obj {
     return new ArrayObj(elements);
   }
 
+  if (node instanceof HashLiteral) {
+    return evaluateHashLiteral(node, env);
+  }
+
   return NULL;
 }
 
@@ -205,6 +209,10 @@ function evaluateIndexExpression(left: Obj, index: Obj): Obj {
     return evaluateArrayIndexExpression(left, index);
   }
 
+  if (left instanceof HashObj) {
+    return evaluateHashIndexExpression(left, index);
+  }
+
   return new ErrorObj(`unknown operator for indexing: ${left.type()}`);
 }
 
@@ -216,6 +224,18 @@ function evaluateArrayIndexExpression(array: ArrayObj, index: IntegerObj): Obj {
   }
 
   return array.elements[index.value];
+}
+
+function evaluateHashIndexExpression(hash: HashObj, index: Obj): Obj {
+  if (!('hash' in index)) {
+    return new ErrorObj(`unusable as hash key: ${index.type()}`);
+  }
+  const hashKey = (index as unknown as Hashable).hash();
+
+  const pair = hash.pairs.get(hashKey);
+  if (pair === undefined) return NULL;
+
+  return pair.value;
 }
 
 function applyFunction(func: Obj, args: Obj[]): Obj {
@@ -366,4 +386,26 @@ function evaluateIfExpression(node: IfExpression, env: Environment): Obj {
   }
 
   return NULL;
+}
+
+function evaluateHashLiteral(node: HashLiteral, env: Environment): Obj {
+  const pairs = new Map<HashKey, HashPair>();
+
+  node.pairs.forEach((valueNode, keyNode) => {
+    const key = evaluate(keyNode, env);
+    if (key instanceof ErrorObj) return key;
+
+    if (!('hash' in key)) {
+      return new ErrorObj(`unusable as hash key: ${key.type()}`);
+    }
+    const hash = (key as unknown as Hashable).hash();
+
+    const value = evaluate(valueNode, env);
+    if (value instanceof ErrorObj) return value;
+
+    pairs.set(hash, {key: key, value: value});
+    return;
+  });
+
+  return new HashObj(pairs);
 }
