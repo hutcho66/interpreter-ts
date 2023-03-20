@@ -41,6 +41,19 @@ export class Environment {
     this.store[name] = value;
     return value;
   }
+
+  // this function only calls set on current scope if
+  // already defined on current scope, otherwise tries to call
+  // set on outer scope, which allows for shadowing
+  // If no matches found, will return undefined
+  reassign(name: string, value: Obj): Obj | undefined {
+    if (this.store[name] !== undefined) {
+      return this.set(name, value);
+    } else if (this.outer) {
+      return this.outer.reassign(name, value);
+    }
+    return undefined;
+  }
 }
 
 export type BuiltinFunction = (args: Obj[]) => Obj;

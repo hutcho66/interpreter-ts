@@ -1,5 +1,6 @@
 import Lexer from '../lexer';
 import Parser from '../parser';
+import {AssignmentStatement} from '../ast';
 import {
   CallExpression,
   ArrayLiteral,
@@ -23,6 +24,7 @@ import {
   PrefixExpression,
   InfixExpression,
 } from '../ast';
+import {TokenType} from '../token';
 
 describe('parser', () => {
   it('should skip invalid statements', () => {
@@ -481,5 +483,22 @@ describe('parser', () => {
 
       expect(expected[keyString]).toBe(valueInt);
     }
+  });
+
+  it('should allow reassignment without let', () => {
+    const input = 'x = x + 1;';
+
+    const lexer = new Lexer(input);
+    const parser = new Parser(lexer);
+
+    const program = parser.parseProgram();
+
+    expect(parser.errors).toHaveLength(0);
+    expect(program.statements).toHaveLength(1);
+
+    const statement = program.statements[0] as AssignmentStatement;
+    expect(statement.token.type).toBe(TokenType.ASSIGN);
+    expect(statement.name.tokenLiteral()).toBe('x');
+    expect(statement.value.string()).toBe('(x + 1)');
   });
 });

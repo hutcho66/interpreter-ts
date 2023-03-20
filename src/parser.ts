@@ -1,6 +1,6 @@
 import Lexer from './lexer';
 import {Token, TokenType} from './token';
-import {HashLiteral} from './ast';
+import {HashLiteral, AssignmentStatement} from './ast';
 import {
   CallExpression,
   StringLiteral,
@@ -141,9 +141,35 @@ export default class Parser {
         return this.parseLetStatement();
       case TokenType.RETURN:
         return this.parseReturnStatement();
+      case TokenType.IDENT:
+        if (this.isPeekToken(TokenType.ASSIGN)) {
+          return this.parseAssignmentStatement();
+        } else {
+          return this.parseExpressionStatement();
+        }
       default:
         return this.parseExpressionStatement();
     }
+  }
+
+  private parseAssignmentStatement(): AssignmentStatement | null {
+    const identifier = new Identifier(
+      this.currentToken,
+      this.currentToken.literal
+    );
+
+    this.nextToken();
+    const token = this.currentToken; // token should be '='
+
+    this.nextToken();
+    const exp = this.parseExpression(Precedence.LOWEST);
+    if (exp === null) return null;
+
+    if (this.isPeekToken(TokenType.SEMICOLON)) {
+      this.nextToken();
+    }
+
+    return new AssignmentStatement(token, identifier, exp);
   }
 
   // parse a let statment

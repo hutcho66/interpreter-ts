@@ -1,5 +1,5 @@
 import {ArrayObj, HashKey, HashPair, Hashable, HashObj} from './object';
-import {IndexExpression, HashLiteral} from './ast';
+import {IndexExpression, HashLiteral, AssignmentStatement} from './ast';
 import {
   Node,
   IntegerLiteral,
@@ -57,6 +57,20 @@ export function evaluate(node: Node, env: Environment): Obj {
     // to default to a 'nil' return which means that LET statements
     // would otherwise return NULL which prints to the REPL
     // This special object type is explicitly ignored by the REPL
+    return EMPTY;
+  }
+
+  if (node instanceof AssignmentStatement) {
+    const value = evaluate(node.value, env);
+    if (value instanceof ErrorObj) return value;
+    const result = env.reassign(node.name.value, value);
+
+    if (result === undefined) {
+      return new ErrorObj(
+        `cant assign to undefined identifier: '${node.name.value}'`
+      );
+    }
+
     return EMPTY;
   }
 
@@ -380,9 +394,11 @@ function evaluateIfExpression(node: IfExpression, env: Environment): Obj {
   if (condition instanceof ErrorObj) return condition;
 
   if (isTruthy(condition)) {
-    return evaluate(node.consequence, env);
+    const enclosingEnv = Environment.enclosedEnv(env);
+    return evaluate(node.consequence, enclosingEnv);
   } else if (node.alternative) {
-    return evaluate(node.alternative, env);
+    const enclosingEnv = Environment.enclosedEnv(env);
+    return evaluate(node.alternative, enclosingEnv);
   }
 
   return NULL;

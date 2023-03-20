@@ -158,11 +158,13 @@ describe('evaluator', () => {
       {input: 'if (1 > 2) { 10 }', expected: undefined},
       {input: 'if (1 > 2) { 10 } else { 20 }', expected: 20},
       {input: 'if (1 < 2) { 10 } else { 20 }', expected: 10},
+      {input: 'let y = 0; if (true) { y = 1; }; y;', expected: 1},
+      {input: 'let y = 0; if (true) { let y = 1; }; y;', expected: 0},
     ];
 
     for (const test of tests) {
       const evaluated = testEvaluate(test.input) as BooleanObj;
-      if (!evaluated.value) {
+      if (evaluated.value === undefined) {
         expect(evaluated.inspect()).toBe(new NullObj().inspect());
       }
       expect(evaluated.value).toBe(test.expected);
@@ -216,6 +218,10 @@ describe('evaluator', () => {
       {input: 'let identity = fn(x) { return x; }; identity(5);', expected: 5},
       {input: 'let double = fn(x) { x * 2; }; double(5);', expected: 10},
       {input: 'let add = fn(x, y) { x + y; }; add(5, 5);', expected: 10},
+      {
+        input: 'let reassign = fn(x) { y = x; }; let y = 1; reassign(5); y;',
+        expected: 5,
+      },
       {
         input: 'let add = fn(x, y) { x + y; }; add(5 + 5, add(5, 5));',
         expected: 20,
@@ -339,6 +345,25 @@ describe('evaluator', () => {
       } else {
         const evaluatedInt = evaluated as IntegerObj;
         expect(evaluatedInt.value).toBe(test.expected);
+      }
+    }
+  });
+
+  it('should evaluate assignments', () => {
+    const tests = [
+      {input: 'let x = 5; x = x + 1; x', expected: 6},
+      {
+        input: 'foobar = 6',
+        expected: "cant assign to undefined identifier: 'foobar'",
+      },
+    ];
+
+    for (const test of tests) {
+      const evaluated = testEvaluate(test.input);
+      if (evaluated instanceof ErrorObj) {
+        expect(evaluated.message).toBe(test.expected);
+      } else if (evaluated instanceof IntegerObj) {
+        expect(evaluated.value).toBe(test.expected);
       }
     }
   });

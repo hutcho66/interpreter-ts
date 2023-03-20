@@ -65,6 +65,25 @@ export class ReturnStatement implements Statement {
   }
 }
 
+//
+// An assignment statement reassigns a variable that has been previously defined
+export class AssignmentStatement implements Statement {
+  type = 'statement' as const;
+  constructor(
+    public token: Token,
+    public name: Identifier,
+    public value: Expression
+  ) {}
+
+  tokenLiteral() {
+    return this.token.literal;
+  }
+
+  string() {
+    return `${this.name.string()} = ${this.value.string()};`;
+  }
+}
+
 // An expression statement is an expression that returns itself
 export class ExpressionStatement implements Statement {
   type = 'statement' as const;

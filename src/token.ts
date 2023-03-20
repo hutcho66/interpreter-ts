@@ -40,6 +40,7 @@ export const enum TokenType {
   FALSE = 'FALSE',
   IF = 'IF',
   ELSE = 'ELSE',
+  // WHILE = 'WHILE',
   RETURN = 'RETURN',
 }
 
