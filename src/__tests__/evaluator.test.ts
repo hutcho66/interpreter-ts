@@ -367,4 +367,28 @@ describe('evaluator', () => {
       }
     }
   });
+
+  it('should evaluate while loops', () => {
+    const tests = [
+      {input: 'let x = 5; while (x > 0) { x = x - 1 }; x', expected: 0},
+      {
+        input:
+          'let x = 5; while (true) { x = x - 1; if (x == 0) { break; } }; x',
+        expected: 0,
+      },
+      {
+        input:
+          'let x = 5; let y = 5; while (x > 0) { x = x - 1; let y = x }; y',
+        expected: 5,
+      },
+    ];
+
+    for (const test of tests) {
+      const evaluated = testEvaluate(test.input) as BooleanObj;
+      if (evaluated.value === undefined) {
+        expect(evaluated.inspect()).toBe(new NullObj().inspect());
+      }
+      expect(evaluated.value).toBe(test.expected);
+    }
+  });
 });

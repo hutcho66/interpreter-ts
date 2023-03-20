@@ -1,5 +1,21 @@
-import {ArrayObj, HashKey, HashPair, Hashable, HashObj} from './object';
-import {IndexExpression, HashLiteral, AssignmentStatement} from './ast';
+import {
+  ArrayObj,
+  HashKey,
+  HashPair,
+  Hashable,
+  HashObj,
+  Obj,
+  IntegerObj,
+  ObjectType,
+  ReturnValueObj,
+  BreakObj,
+} from './object';
+import {
+  IndexExpression,
+  HashLiteral,
+  AssignmentStatement,
+  WhileExpression,
+} from './ast';
 import {
   Node,
   IntegerLiteral,
@@ -9,7 +25,6 @@ import {
   FunctionLiteral,
   ArrayLiteral,
 } from './ast';
-import {Obj, IntegerObj, ObjectType, ReturnValueObj} from './object';
 import {
   ReturnStatement,
   Identifier,
@@ -32,6 +47,8 @@ import {
   IfExpression,
 } from './ast';
 import {BOOLEAN, BUILTIN, EMPTY, INTEGER, NULL} from './builtins';
+import {BreakStatement} from './ast';
+import {NullObj, EmptyObj} from './object';
 
 export function evaluate(node: Node, env: Environment): Obj {
   if (node instanceof Program) {
@@ -48,9 +65,20 @@ export function evaluate(node: Node, env: Environment): Obj {
     return new ReturnValueObj(value);
   }
 
+  if (node instanceof BreakStatement) {
+    return new BreakObj();
+  }
+
   if (node instanceof LetStatement) {
     const value = evaluate(node.value, env);
     if (value instanceof ErrorObj) return value;
+    if (
+      value instanceof NullObj ||
+      value instanceof EmptyObj ||
+      value instanceof BreakObj
+    ) {
+      return new ErrorObj(`cant assign null to variable '${node.name.value}'`);
+    }
     env.set(node.name.value, value);
 
     // Unlike the go implementation, typescript won't allow us
@@ -63,6 +91,14 @@ export function evaluate(node: Node, env: Environment): Obj {
   if (node instanceof AssignmentStatement) {
     const value = evaluate(node.value, env);
     if (value instanceof ErrorObj) return value;
+    if (
+      value instanceof NullObj ||
+      value instanceof EmptyObj ||
+      value instanceof BreakObj
+    ) {
+      return new ErrorObj(`cant assign null to variable '${node.name.value}'`);
+    }
+
     const result = env.reassign(node.name.value, value);
 
     if (result === undefined) {
@@ -98,6 +134,10 @@ export function evaluate(node: Node, env: Environment): Obj {
 
   if (node instanceof IfExpression) {
     return evaluateIfExpression(node, env);
+  }
+
+  if (node instanceof WhileExpression) {
+    return evaluateWhileExpression(node, env);
   }
 
   if (node instanceof CallExpression) {
@@ -174,7 +214,9 @@ function evaluateBlockStatement(block: BlockStatement, env: Environment): Obj {
 
     if (
       result !== NULL &&
-      (result instanceof ReturnValueObj || result instanceof ErrorObj)
+      (result instanceof ReturnValueObj ||
+        result instanceof BreakObj ||
+        result instanceof ErrorObj)
     ) {
       return result;
     }
@@ -402,6 +444,26 @@ function evaluateIfExpression(node: IfExpression, env: Environment): Obj {
   }
 
   return NULL;
+}
+
+function evaluateWhileExpression(node: WhileExpression, env: Environment): Obj {
+  let condition = evaluate(node.condition, env);
+  if (condition instanceof ErrorObj) return condition;
+
+  let result: Obj = NULL;
+
+  while (condition === BOOLEAN.TRUE) {
+    const enclosingEnv = Environment.enclosedEnv(env);
+    result = evaluate(node.loop, enclosingEnv);
+    if (result instanceof ErrorObj) return result;
+    if (result instanceof BreakObj) return EMPTY;
+
+    // re-evaluate condition using outer env
+    condition = evaluate(node.condition, env);
+    if (condition instanceof ErrorObj) return condition;
+  }
+
+  return result;
 }
 
 function evaluateHashLiteral(node: HashLiteral, env: Environment): Obj {

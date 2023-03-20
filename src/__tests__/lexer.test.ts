@@ -46,7 +46,8 @@ describe('lexer', () => {
       "foobar"
       "foo bar"
       [1, 2];
-      {"foo": "bar"};`;
+      {"foo": "bar"};
+      while (true) { 0; break }`;
     const expectedTokens: Token[] = [
       {type: TokenType.LET, literal: 'let'},
       {type: TokenType.IDENT, literal: 'five'},
@@ -129,6 +130,15 @@ describe('lexer', () => {
       {type: TokenType.STRING, literal: 'bar'},
       {type: TokenType.RBRACE, literal: '}'},
       {type: TokenType.SEMICOLON, literal: ';'},
+      {type: TokenType.WHILE, literal: 'while'},
+      {type: TokenType.LPAREN, literal: '('},
+      {type: TokenType.TRUE, literal: 'true'},
+      {type: TokenType.RPAREN, literal: ')'},
+      {type: TokenType.LBRACE, literal: '{'},
+      {type: TokenType.INT, literal: '0'},
+      {type: TokenType.SEMICOLON, literal: ';'},
+      {type: TokenType.BREAK, literal: 'break'},
+      {type: TokenType.RBRACE, literal: '}'},
       {type: TokenType.EOF, literal: ''},
     ];
     const lexer = new Lexer(input);

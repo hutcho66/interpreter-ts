@@ -8,6 +8,7 @@ export const enum ObjectType {
   STRING_OBJ = 'STRING',
   BOOLEAN_OBJ = 'BOOLEAN',
   RETURN_VALUE_OBJ = 'RETURN_VALUE',
+  BREAK_OBJ = 'BREAK',
   ERROR_OBJ = 'ERROR',
   FUNCTION_OBJ = 'FUNCTION',
   BUILTIN_OBJ = 'BUILTIN',
@@ -133,6 +134,13 @@ export class NullObj implements Obj {
 export class EmptyObj implements Obj {
   constructor() {}
   type = () => ObjectType.EMPTY_OBJ;
+  inspect = () => '';
+  display = this.inspect;
+}
+
+export class BreakObj implements Obj {
+  constructor() {}
+  type = () => ObjectType.BREAK_OBJ;
   inspect = () => '';
   display = this.inspect;
 }

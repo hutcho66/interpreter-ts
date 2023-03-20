@@ -1,6 +1,11 @@
 import Lexer from './lexer';
 import {Token, TokenType} from './token';
-import {HashLiteral, AssignmentStatement} from './ast';
+import {
+  HashLiteral,
+  AssignmentStatement,
+  WhileExpression,
+  BreakStatement,
+} from './ast';
 import {
   CallExpression,
   StringLiteral,
@@ -80,6 +85,7 @@ export default class Parser {
       [TokenType.LBRACKET]: this.parseArrayLiteral,
       [TokenType.LBRACE]: this.parseHashLiteral,
       [TokenType.IF]: this.parseIfExpression,
+      [TokenType.WHILE]: this.parseWhileExpression,
       [TokenType.FUNCTION]: this.parseFunctionLiteral,
     };
     this.infixParsingFunctions = {
@@ -147,9 +153,21 @@ export default class Parser {
         } else {
           return this.parseExpressionStatement();
         }
+      case TokenType.BREAK:
+        return this.parseBreakStatement();
       default:
         return this.parseExpressionStatement();
     }
+  }
+
+  private parseBreakStatement(): BreakStatement | null {
+    const token = this.currentToken;
+
+    if (this.isPeekToken(TokenType.SEMICOLON)) {
+      this.nextToken();
+    }
+
+    return new BreakStatement(token);
   }
 
   private parseAssignmentStatement(): AssignmentStatement | null {
@@ -379,6 +397,35 @@ export default class Parser {
     }
 
     return new IfExpression(token, condition, consequence);
+  };
+
+  // parse an while expression - must be arrow function to retain this context
+  private parseWhileExpression = () => {
+    const token = this.currentToken;
+    if (!this.expectNextToken(TokenType.LPAREN)) {
+      return null;
+    }
+
+    this.nextToken();
+    const condition = this.parseExpression(Precedence.LOWEST);
+    if (condition === null) {
+      return null;
+    }
+
+    if (!this.expectNextToken(TokenType.RPAREN)) {
+      return null;
+    }
+
+    if (!this.expectNextToken(TokenType.LBRACE)) {
+      return null;
+    }
+
+    const loop = this.parseBlockStatement();
+    if (loop === null) {
+      return null;
+    }
+
+    return new WhileExpression(token, condition, loop);
   };
 
   // parse a function literal - must be arrow function to retain this context

@@ -227,6 +227,39 @@ export class IfExpression implements Expression {
   }
 }
 
+// A while expression has a condition expression and a loop block statement
+export class WhileExpression implements Expression {
+  type = 'expression' as const;
+  constructor(
+    public token: Token,
+    public condition: Expression,
+    public loop: BlockStatement
+  ) {}
+
+  tokenLiteral() {
+    return this.token.literal;
+  }
+
+  string() {
+    const s = `while ${this.condition.string()} ${this.loop.string()}`;
+
+    return s;
+  }
+}
+
+export class BreakStatement implements Statement {
+  type = 'statement' as const;
+  constructor(public token: Token) {}
+
+  tokenLiteral() {
+    return this.token.literal;
+  }
+
+  string() {
+    return this.token.literal;
+  }
+}
+
 // An function literal has a list of parameters and a body
 export class FunctionLiteral implements Expression {
   type = 'expression' as const;

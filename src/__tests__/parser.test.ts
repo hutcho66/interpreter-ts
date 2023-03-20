@@ -1,6 +1,6 @@
 import Lexer from '../lexer';
 import Parser from '../parser';
-import {AssignmentStatement} from '../ast';
+import {AssignmentStatement, WhileExpression} from '../ast';
 import {
   CallExpression,
   ArrayLiteral,
@@ -500,5 +500,30 @@ describe('parser', () => {
     expect(statement.token.type).toBe(TokenType.ASSIGN);
     expect(statement.name.tokenLiteral()).toBe('x');
     expect(statement.value.string()).toBe('(x + 1)');
+  });
+
+  it('should parse while expressions', () => {
+    const input = 'while (x < 5) { x = x + 1; break;}';
+
+    const lexer = new Lexer(input);
+    const parser = new Parser(lexer);
+
+    const program = parser.parseProgram();
+
+    expect(parser.errors).toHaveLength(0);
+    expect(program.statements).toHaveLength(1);
+
+    const statement = program.statements[0] as ExpressionStatement;
+    const expression = statement.value as WhileExpression;
+
+    const condition = expression.condition as InfixExpression;
+    expect(condition.left.tokenLiteral()).toEqual('x');
+    expect(condition.operator).toEqual('<');
+    expect(condition.right.tokenLiteral()).toEqual('5');
+
+    const loop = expression.loop as BlockStatement;
+    expect(loop.statements).toHaveLength(2);
+    expect(loop.statements[0].string()).toEqual('x = (x + 1);');
+    expect(loop.statements[1].tokenLiteral()).toEqual('break');
   });
 });

@@ -40,8 +40,9 @@ export const enum TokenType {
   FALSE = 'FALSE',
   IF = 'IF',
   ELSE = 'ELSE',
-  // WHILE = 'WHILE',
+  WHILE = 'WHILE',
   RETURN = 'RETURN',
+  BREAK = 'BREAK',
 }
 
 export class Token {
@@ -55,6 +56,8 @@ const keywords: {[keyword: string]: TokenType} = {
   false: TokenType.FALSE,
   if: TokenType.IF,
   else: TokenType.ELSE,
+  while: TokenType.WHILE,
+  break: TokenType.BREAK,
   return: TokenType.RETURN,
 };
 
