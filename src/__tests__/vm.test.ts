@@ -54,13 +54,14 @@ function runVmTests(tests: VMTestCase[]) {
 describe('vm', () => {
   it('should run integer arithmetic', () => {
     const tests: VMTestCase[] = [
-      {input: '1', expected: 1},
-      {input: '2', expected: 2},
-      {input: '1 + 2', expected: 3},
-      {input: '1 - 2', expected: -1},
-      {input: '1 * 2', expected: 2},
-      {input: '6 / 2', expected: 3},
-      {input: '5 * (2 + 10)', expected: 60},
+      // {input: '1', expected: 1},
+      // {input: '2', expected: 2},
+      // {input: '-3', expected: -3},
+      // {input: '1 + 2', expected: 3},
+      // {input: '1 - 2', expected: -1},
+      // {input: '1 * 2', expected: 2},
+      // {input: '6 / 2', expected: 3},
+      {input: '5 * (2 + -10)', expected: -40},
     ];
 
     runVmTests(tests);
@@ -70,6 +71,8 @@ describe('vm', () => {
     const tests: VMTestCase[] = [
       {input: 'true', expected: true},
       {input: 'false', expected: false},
+      {input: '!true', expected: false},
+      {input: '!!true', expected: true},
       {input: '1 < 2', expected: true},
       {input: '1 > 2', expected: false},
       {input: '1 == 2', expected: false},

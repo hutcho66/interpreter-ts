@@ -7,7 +7,7 @@ import {
 } from './ast';
 import {Instructions, make, Opcode} from './code';
 import {Obj, IntegerObj} from './object';
-import {BooleanLiteral} from './ast';
+import {BooleanLiteral, PrefixExpression} from './ast';
 
 export type Bytecode = {
   instructions: Instructions;
@@ -73,6 +73,21 @@ export default class Compiler {
           break;
         default:
           throw new CompileError(`unknown operator: ${node.operator}`);
+      }
+    }
+
+    if (node instanceof PrefixExpression) {
+      this.compile(node.right);
+
+      switch (node.operator) {
+        case '!':
+          this.emit(Opcode.OpBang);
+          break;
+        case '-':
+          this.emit(Opcode.OpMinus);
+          break;
+        default:
+          throw new CompileError(`unknown operator ${node.operator}`);
       }
     }
 

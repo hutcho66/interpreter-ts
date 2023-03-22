@@ -96,6 +96,15 @@ describe('compiler', () => {
           make(Opcode.OpPop),
         ],
       },
+      {
+        input: '-3',
+        expectedConstants: [3],
+        expectedInstructions: [
+          make(Opcode.OpConstant, 0),
+          make(Opcode.OpMinus),
+          make(Opcode.OpPop),
+        ],
+      },
     ];
 
     runCompilerTests(tests);
@@ -170,6 +179,15 @@ describe('compiler', () => {
           make(Opcode.OpTrue),
           make(Opcode.OpFalse),
           make(Opcode.OpNotEqual),
+          make(Opcode.OpPop),
+        ],
+      },
+      {
+        input: '!true',
+        expectedConstants: [],
+        expectedInstructions: [
+          make(Opcode.OpTrue),
+          make(Opcode.OpBang),
           make(Opcode.OpPop),
         ],
       },

@@ -44,6 +44,12 @@ export default class VM {
         case Opcode.OpFalse:
           this.push(BOOLEAN.FALSE);
           break;
+        case Opcode.OpBang:
+          this.executeBangOperator();
+          break;
+        case Opcode.OpMinus:
+          this.executeMinusOperator();
+          break;
         case Opcode.OpAdd:
         case Opcode.OpSub:
         case Opcode.OpMul:
@@ -60,6 +66,30 @@ export default class VM {
       }
     }
   }
+
+  private executeBangOperator = () => {
+    const operand = this.pop();
+
+    switch (operand) {
+      case BOOLEAN.FALSE:
+        return this.push(BOOLEAN.TRUE);
+      case BOOLEAN.TRUE:
+      default:
+        return this.push(BOOLEAN.FALSE);
+    }
+  };
+
+  private executeMinusOperator = () => {
+    const operand = this.pop();
+
+    if (operand instanceof IntegerObj) {
+      return this.push(INTEGER(-operand.value));
+    }
+
+    throw new ExecutionError(
+      `unsupported type for negation: ${operand.type()}`
+    );
+  };
 
   private executeComparison = (op: Opcode) => {
     const right = this.pop();

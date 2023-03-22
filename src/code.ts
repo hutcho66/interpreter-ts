@@ -5,6 +5,8 @@ export const enum Opcode {
   OpTrue,
   OpFalse,
   OpPop,
+  OpMinus,
+  OpBang,
   OpAdd,
   OpSub,
   OpMul,
@@ -34,6 +36,14 @@ const definitions: {[key in Opcode]?: Definition} = {
   },
   [Opcode.OpPop]: {
     name: 'OpPop',
+    operandWidths: [],
+  },
+  [Opcode.OpMinus]: {
+    name: 'OpMinus',
+    operandWidths: [],
+  },
+  [Opcode.OpBang]: {
+    name: 'OpBang',
     operandWidths: [],
   },
   [Opcode.OpAdd]: {
