@@ -4,6 +4,7 @@ export const enum Opcode {
   OpConstant,
   OpTrue,
   OpFalse,
+  OpNull,
   OpPop,
   OpMinus,
   OpBang,
@@ -14,6 +15,13 @@ export const enum Opcode {
   OpEqual,
   OpNotEqual,
   OpGreaterThan,
+  OpJumpNotTruthy,
+  OpJump,
+  OpGetGlobal,
+  OpSetGlobal,
+  OpArray,
+  OpHash,
+  OpIndex,
 }
 
 type Definition = {
@@ -32,6 +40,10 @@ const definitions: {[key in Opcode]?: Definition} = {
   },
   [Opcode.OpFalse]: {
     name: 'OpFalse',
+    operandWidths: [],
+  },
+  [Opcode.OpNull]: {
+    name: 'OpNull',
     operandWidths: [],
   },
   [Opcode.OpPop]: {
@@ -72,6 +84,34 @@ const definitions: {[key in Opcode]?: Definition} = {
   },
   [Opcode.OpGreaterThan]: {
     name: 'OpGreaterThan',
+    operandWidths: [],
+  },
+  [Opcode.OpJumpNotTruthy]: {
+    name: 'OpJumpNotTruthy',
+    operandWidths: [2],
+  },
+  [Opcode.OpJump]: {
+    name: 'OpJump',
+    operandWidths: [2],
+  },
+  [Opcode.OpGetGlobal]: {
+    name: 'OpGetGlobal',
+    operandWidths: [2],
+  },
+  [Opcode.OpSetGlobal]: {
+    name: 'OpSetGlobal',
+    operandWidths: [2],
+  },
+  [Opcode.OpArray]: {
+    name: 'OpArray',
+    operandWidths: [2],
+  },
+  [Opcode.OpHash]: {
+    name: 'OpHash',
+    operandWidths: [2],
+  },
+  [Opcode.OpIndex]: {
+    name: 'OpIndex',
     operandWidths: [],
   },
 };
