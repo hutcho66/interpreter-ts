@@ -266,7 +266,8 @@ export class FunctionLiteral implements Expression {
   constructor(
     public token: Token,
     public parameters: Identifier[],
-    public body: BlockStatement
+    public body: BlockStatement,
+    public name?: string
   ) {}
 
   tokenLiteral() {
@@ -275,6 +276,7 @@ export class FunctionLiteral implements Expression {
 
   string() {
     let s = `${this.token.literal} (`;
+    s += this.name ? this.name : '';
     s += this.parameters.map(param => param.string());
     s += `) ${this.body.string()}`;
 

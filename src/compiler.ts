@@ -5,9 +5,10 @@ import {
   InfixExpression,
   IntegerLiteral,
   Expression,
+  FunctionLiteral,
 } from './ast';
 import {Instructions, make, Opcode} from './code';
-import {Obj, IntegerObj, StringObj} from './object';
+import {Obj, IntegerObj, StringObj, CompiledFunctionObj} from './object';
 import {
   LetStatement,
   Identifier,
@@ -21,8 +22,10 @@ import {
   IfExpression,
   BlockStatement,
 } from './ast';
-import SymbolTable from './symbol_table';
-import {IndexExpression} from './ast';
+import SymbolTable, {SymbolScope} from './symbol_table';
+import {IndexExpression, ReturnStatement, CallExpression} from './ast';
+import {BUILTIN} from './builtins';
+import {ISymbol} from './symbol_table';
 
 export type Bytecode = {
   instructions: Instructions;
@@ -34,6 +37,12 @@ type EmittedInstruction = {
   position: number;
 };
 
+type CompilationScope = {
+  instructions: Instructions;
+  lastInstruction: EmittedInstruction;
+  previousInstruction: EmittedInstruction;
+};
+
 class CompileError extends Error {
   constructor(message: string) {
     super(message);
@@ -42,15 +51,29 @@ class CompileError extends Error {
 }
 
 export default class Compiler {
-  private instructions: Instructions = Buffer.alloc(0);
   private constants: Obj[] = [];
-  private lastInstruction: EmittedInstruction = {} as EmittedInstruction;
-  private previousInstruction: EmittedInstruction = {} as EmittedInstruction;
   private symbolTable: SymbolTable = new SymbolTable();
+  private scopes: CompilationScope[] = [];
+  private scopeIndex = 0;
 
   public constructor(symbolTable?: SymbolTable, constants?: Obj[]) {
-    if (symbolTable) this.symbolTable = symbolTable;
+    if (symbolTable) {
+      this.symbolTable = symbolTable;
+    } else {
+      this.symbolTable = new SymbolTable();
+      // define builtins
+      BUILTIN.forEach((value, i) =>
+        this.symbolTable.defineBuiltin(i, value.name)
+      );
+    }
     if (constants) this.constants = constants;
+
+    // add main scope
+    this.scopes.push({
+      instructions: Buffer.alloc(0),
+      lastInstruction: {} as EmittedInstruction,
+      previousInstruction: {} as EmittedInstruction,
+    });
   }
 
   public compile(node: Node) {
@@ -72,9 +95,16 @@ export default class Compiler {
     }
 
     if (node instanceof LetStatement) {
-      this.compile(node.value);
       const symbol = this.symbolTable.define(node.name.value);
-      this.emit(Opcode.OpSetGlobal, symbol.index);
+      this.compile(node.value);
+      if (symbol.scope === SymbolScope.GlobalScope)
+        this.emit(Opcode.OpSetGlobal, symbol.index);
+      else this.emit(Opcode.OpSetLocal, symbol.index);
+    }
+
+    if (node instanceof ReturnStatement) {
+      this.compile(node.value);
+      this.emit(Opcode.OpReturnValue);
     }
 
     if (node instanceof InfixExpression) {
@@ -139,26 +169,26 @@ export default class Compiler {
 
       // compile consequence and remove final pop so that expression result is left on stack
       this.compile(node.consequence);
-      this.removeLastPopIfPresent();
+      if (this.isLastOp(Opcode.OpPop)) this.removePop();
 
       // emit OpJump with placeholder value
       const jumpPosition = this.emit(Opcode.OpJump, 9999);
 
       // change position of OpJumpNotTruthy to after consequence
-      const afterConsequencePosition = this.instructions.length;
+      const afterConsequencePosition = this.currentInstructions().length;
       this.changeOperand(jumpNotTruthyPosition, afterConsequencePosition);
 
       if (node.alternative) {
         // compile alternative and remove final pop so that expression result is left on stack
         this.compile(node.alternative);
-        this.removeLastPopIfPresent();
+        if (this.isLastOp(Opcode.OpPop)) this.removePop();
       } else {
         // emit OpNull as alternative
         this.emit(Opcode.OpNull);
       }
 
       // change position of OpJump to after alternative
-      const afterAlternativePosition = this.instructions.length;
+      const afterAlternativePosition = this.currentInstructions().length;
       this.changeOperand(jumpPosition, afterAlternativePosition);
     }
 
@@ -168,12 +198,19 @@ export default class Compiler {
       this.emit(Opcode.OpIndex);
     }
 
+    if (node instanceof CallExpression) {
+      this.compile(node.func);
+      node.args.forEach(arg => this.compile(arg));
+      this.emit(Opcode.OpCall, node.args.length);
+    }
+
     if (node instanceof Identifier) {
       const symbol = this.symbolTable.resolve(node.value);
       if (!symbol) {
         throw new CompileError(`undefined variable ${node.value}`);
       }
-      this.emit(Opcode.OpGetGlobal, symbol.index);
+
+      this.loadSymbol(symbol);
     }
 
     if (node instanceof IntegerLiteral) {
@@ -215,14 +252,87 @@ export default class Compiler {
       this.emit(Opcode.OpHash, node.pairs.size * 2);
     }
 
+    if (node instanceof FunctionLiteral) {
+      this.enterScope();
+
+      if (node.name) this.symbolTable.defineFunctionName(node.name);
+
+      node.parameters.forEach(param => this.symbolTable.define(param.value));
+
+      this.compile(node.body);
+      // replace last pop with return value
+      if (this.isLastOp(Opcode.OpPop)) this.replacePopWithReturn();
+
+      // if there is no pop, inject null return
+      if (!this.isLastOp(Opcode.OpReturnValue)) this.emit(Opcode.OpReturnNull);
+
+      const freeSymbols = this.symbolTable.freeSymbols;
+      const numLocals = this.symbolTable.numDefinitions;
+      const instructions = this.leaveScope();
+
+      freeSymbols.forEach(s => this.loadSymbol(s));
+
+      const compiledFunction = new CompiledFunctionObj(
+        instructions,
+        numLocals,
+        node.parameters.length
+      );
+      const funcIndex = this.addConstant(compiledFunction);
+      this.emit(Opcode.OpClosure, funcIndex, freeSymbols.length);
+    }
+
     return null;
   }
 
   public bytecode(): Bytecode {
     return {
-      instructions: this.instructions,
+      instructions: this.currentInstructions(),
       constants: this.constants,
     };
+  }
+
+  private enterScope() {
+    this.scopes.push({
+      instructions: Buffer.alloc(0),
+      lastInstruction: {} as EmittedInstruction,
+      previousInstruction: {} as EmittedInstruction,
+    });
+
+    this.symbolTable = new SymbolTable(this.symbolTable);
+
+    this.scopeIndex++;
+  }
+
+  private leaveScope() {
+    // move up a scope level and return current scope instructions
+    const instructions = this.currentInstructions();
+
+    this.scopes = this.scopes.slice(0, this.scopes.length - 1);
+    this.scopeIndex--;
+
+    this.symbolTable = this.symbolTable.outer!;
+
+    return instructions;
+  }
+
+  private loadSymbol(s: ISymbol) {
+    switch (s.scope) {
+      case SymbolScope.GlobalScope:
+        this.emit(Opcode.OpGetGlobal, s.index);
+        break;
+      case SymbolScope.LocalScope:
+        this.emit(Opcode.OpGetLocal, s.index);
+        break;
+      case SymbolScope.BuiltinScope:
+        this.emit(Opcode.OpGetBuiltin, s.index);
+        break;
+      case SymbolScope.FreeScope:
+        this.emit(Opcode.OpGetFree, s.index);
+        break;
+      case SymbolScope.FunctionScope:
+        this.emit(Opcode.OpCurrentClosure);
+        break;
+    }
   }
 
   private addConstant(obj: Obj): number {
@@ -231,8 +341,11 @@ export default class Compiler {
   }
 
   private addInstruction(instruction: Instructions): number {
-    const position = this.instructions.length;
-    this.instructions = Buffer.concat([this.instructions, instruction]);
+    const position = this.currentInstructions().length;
+    this.scopes[this.scopeIndex].instructions = Buffer.concat([
+      this.currentInstructions(),
+      instruction,
+    ]);
 
     return position;
   }
@@ -246,26 +359,43 @@ export default class Compiler {
     return position;
   }
 
-  private setLastInstruction(op: Opcode, position: number) {
-    const previous = this.lastInstruction;
-    const last: EmittedInstruction = {opcode: op, position};
-
-    this.previousInstruction = previous;
-    this.lastInstruction = last;
+  private currentInstructions() {
+    return this.scopes[this.scopeIndex].instructions;
   }
 
-  private removeLastPopIfPresent() {
-    if (this.lastInstruction.opcode === Opcode.OpPop) {
-      this.instructions = this.instructions.slice(
-        0,
-        this.lastInstruction.position
-      );
-      this.lastInstruction = this.previousInstruction;
-    }
+  private setLastInstruction(op: Opcode, position: number) {
+    const previous = this.scopes[this.scopeIndex].lastInstruction;
+    const last: EmittedInstruction = {opcode: op, position};
+
+    this.scopes[this.scopeIndex].previousInstruction = previous;
+    this.scopes[this.scopeIndex].lastInstruction = last;
+  }
+
+  private isLastOp(op: Opcode) {
+    const lastInstruction = this.scopes[this.scopeIndex].lastInstruction;
+    return lastInstruction.opcode === op;
+  }
+
+  private removePop() {
+    const lastInstruction = this.scopes[this.scopeIndex].lastInstruction;
+    const prevInstruction = this.scopes[this.scopeIndex].previousInstruction;
+
+    const oldInstructions = this.currentInstructions();
+    const newInstructions = oldInstructions.slice(0, lastInstruction.position);
+
+    this.scopes[this.scopeIndex].instructions = newInstructions;
+    this.scopes[this.scopeIndex].lastInstruction = prevInstruction;
+  }
+
+  private replacePopWithReturn() {
+    const lastPosition = this.scopes[this.scopeIndex].lastInstruction.position;
+    this.replaceInstruction(lastPosition, make(Opcode.OpReturnValue));
+
+    this.scopes[this.scopeIndex].lastInstruction.opcode = Opcode.OpReturnValue;
   }
 
   private changeOperand(opPosition: number, operand: number) {
-    const op = this.instructions[opPosition];
+    const op = this.currentInstructions()[opPosition];
     const newInstruction = make(op, operand);
 
     this.replaceInstruction(opPosition, newInstruction);
@@ -273,7 +403,7 @@ export default class Compiler {
 
   private replaceInstruction(position: number, newInstruction: Instructions) {
     for (let i = 0; i < newInstruction.length; i++) {
-      this.instructions[position + i] = newInstruction[i];
+      this.currentInstructions()[position + i] = newInstruction[i];
     }
   }
 }

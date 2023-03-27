@@ -1,5 +1,5 @@
 /* eslint-disable no-case-declarations */
-import {Instructions, Opcode} from './code';
+import {Opcode} from './code';
 import {
   IntegerObj,
   Obj,
@@ -9,13 +9,17 @@ import {
   HashKey,
   HashPair,
   Hashable,
+  CompiledFunctionObj,
+  ClosureObj,
 } from './object';
 import {Bytecode} from './compiler';
-import {BOOLEAN, INTEGER, NULL} from './builtins';
-import {HashObj} from './object';
+import {BOOLEAN, BUILTIN, INTEGER, NULL} from './builtins';
+import {HashObj, BuiltinObj, ErrorObj} from './object';
+import {Frame} from './frame';
 
 export const STACK_SIZE = 2048;
 export const GLOBALS_SIZE = 65536;
+export const FRAMES_SIZE = 1024;
 
 class ExecutionError extends Error {
   constructor(message: string) {
@@ -26,31 +30,42 @@ class ExecutionError extends Error {
 
 export default class VM {
   private constants: Obj[];
-  private instructions: Instructions;
 
   private stack = new Array<Obj>(STACK_SIZE);
   private globals = new Array<Obj>(GLOBALS_SIZE);
   private sp = 0;
 
+  private frames: Frame[] = new Array<Frame>(FRAMES_SIZE);
+  private framesIndex = 1;
+
   constructor(bytecode: Bytecode, globals?: Obj[]) {
     this.constants = bytecode.constants;
-    this.instructions = bytecode.instructions;
 
     if (globals) this.globals = globals;
-  }
 
-  public lastPoppedStackElement(): Obj | null {
-    return this.stack[this.sp];
+    const mainFrame = new Frame(
+      new ClosureObj(new CompiledFunctionObj(bytecode.instructions, 0, 0), []),
+      0
+    );
+    this.frames[0] = mainFrame;
   }
 
   public run() {
-    for (let ip = 0; ip < this.instructions.length; ip++) {
-      const op = this.instructions[ip] as Opcode;
+    while (
+      this.currentFrame().ip <
+      this.currentFrame().instructions().length - 1
+    ) {
+      this.currentFrame().ip++;
+
+      const ip = this.currentFrame().ip;
+      const instructions = this.currentFrame().instructions();
+
+      const op = instructions[ip] as Opcode;
 
       switch (op) {
         case Opcode.OpConstant:
-          this.push(this.constants[this.instructions.readUInt16BE(ip + 1)]);
-          ip += 2;
+          this.push(this.constants[instructions.readUInt16BE(ip + 1)]);
+          this.currentFrame().ip += 2;
           break;
         case Opcode.OpTrue:
           this.push(BOOLEAN.TRUE);
@@ -83,36 +98,54 @@ export default class VM {
           break;
         case Opcode.OpJump:
           // move ip to one before jump location, since ip is advance in the loop
-          ip = this.instructions.readUint16BE(ip + 1) - 1;
+          this.currentFrame().ip = instructions.readUint16BE(ip + 1) - 1;
           break;
         case Opcode.OpJumpNotTruthy:
           // store jump pos
-          const jumpPos = this.instructions.readUint16BE(ip + 1);
+          const jumpPos = instructions.readUint16BE(ip + 1);
           // advance ip by two to get instruction after jump
-          ip += 2;
+          this.currentFrame().ip += 2;
           // if top of stack is falsey, set ip to jump pos
-          if (!this.isTruthy(this.pop())) ip = jumpPos - 1;
+          if (!this.isTruthy(this.pop())) this.currentFrame().ip = jumpPos - 1;
           break;
         case Opcode.OpSetGlobal: {
           // get index and increment pointer to next instruction
-          const globalIndex = this.instructions.readUint16BE(ip + 1);
-          ip += 2;
+          const globalIndex = instructions.readUint16BE(ip + 1);
+          this.currentFrame().ip += 2;
           // set global to top of stack
           this.globals[globalIndex] = this.pop();
           break;
         }
         case Opcode.OpGetGlobal: {
           // get index and increment pointer to next instruction
-          const globalIndex = this.instructions.readUint16BE(ip + 1);
-          ip += 2;
+          const globalIndex = instructions.readUint16BE(ip + 1);
+          this.currentFrame().ip += 2;
           // retrieve global and push to stack
           this.push(this.globals[globalIndex]);
           break;
         }
+        case Opcode.OpSetLocal: {
+          // get index and increment pointer to next instruction
+          const localIndex = instructions.readUInt8(ip + 1);
+          this.currentFrame().ip += 1;
+          // set local inside reserved space on stack
+          const frame = this.currentFrame();
+          this.stack[frame.basePointer + localIndex] = this.pop();
+          break;
+        }
+        case Opcode.OpGetLocal: {
+          // get index and increment pointer to next instruction
+          const localIndex = instructions.readUInt8(ip + 1);
+          this.currentFrame().ip += 1;
+          // retrieve local from reserved space on stack
+          const frame = this.currentFrame();
+          this.push(this.stack[frame.basePointer + localIndex]);
+          break;
+        }
         case Opcode.OpArray: {
           // read number of elements from instruction and progress pointer to next instruction
-          const numElements = this.instructions.readUint16BE(ip + 1);
-          ip += 2;
+          const numElements = instructions.readUint16BE(ip + 1);
+          this.currentFrame().ip += 2;
 
           // build array from last N stack elements
           const array = this.buildArray(this.sp - numElements, this.sp);
@@ -123,8 +156,8 @@ export default class VM {
         }
         case Opcode.OpHash: {
           // read number of elements from instruction and progress pointer to next instruction
-          const numElements = this.instructions.readUint16BE(ip + 1);
-          ip += 2;
+          const numElements = instructions.readUint16BE(ip + 1);
+          this.currentFrame().ip += 2;
 
           // build hash from last N stack elements
           const hash = this.buildHash(this.sp - numElements, this.sp);
@@ -140,8 +173,133 @@ export default class VM {
           this.executeIndexExpression(left, index);
           break;
         }
+        case Opcode.OpReturnNull: {
+          // pop frame and return stack pointer to before call
+          const frame = this.popFrame();
+          this.sp = frame.basePointer - 1;
+
+          this.push(NULL);
+          break;
+        }
+        case Opcode.OpReturnValue: {
+          const returnValue = this.pop();
+
+          // pop frame and return stack pointer to before call
+          const frame = this.popFrame();
+          this.sp = frame.basePointer - 1;
+
+          this.push(returnValue);
+          break;
+        }
+        case Opcode.OpCall: {
+          const numArgs = instructions.readUint8(ip + 1);
+          this.currentFrame().ip += 1;
+
+          this.executeCall(numArgs);
+          break;
+        }
+        case Opcode.OpGetBuiltin: {
+          const builtinIndex = instructions.readUint8(ip + 1);
+          this.currentFrame().ip += 1;
+
+          const definition = BUILTIN[builtinIndex];
+          this.push(definition.builtin);
+          break;
+        }
+        case Opcode.OpClosure: {
+          const fnIndex = instructions.readUInt16BE(ip + 1);
+          const numFree = instructions.readUint8(ip + 3);
+          this.currentFrame().ip += 3;
+
+          this.pushClosure(fnIndex, numFree);
+          break;
+        }
+        case Opcode.OpGetFree: {
+          const freeIndex = instructions.readUInt8(ip + 1);
+          this.currentFrame().ip += 1;
+
+          const currentClosure = this.currentFrame().cl;
+          this.push(currentClosure.free[freeIndex]);
+          break;
+        }
+        case Opcode.OpCurrentClosure: {
+          const currentClosure = this.currentFrame().cl;
+          this.push(currentClosure);
+          break;
+        }
       }
     }
+  }
+
+  public lastPoppedStackElement(): Obj | null {
+    return this.stack[this.sp];
+  }
+
+  private executeCall(numArgs: number) {
+    const callee = this.stack[this.sp - 1 - numArgs];
+    if (callee instanceof ClosureObj) {
+      return this.callClosure(callee, numArgs);
+    }
+    if (callee instanceof BuiltinObj) {
+      return this.callBuiltin(callee, numArgs);
+    }
+
+    throw new ExecutionError(`cannot call object of type ${callee.type()}`);
+  }
+
+  private callClosure(closure: ClosureObj, numArgs: number) {
+    if (numArgs !== closure.func.numParameters) {
+      throw new ExecutionError(
+        `wrong number of arguments: expected ${closure.func.numParameters}, got ${numArgs}`
+      );
+    }
+
+    const frame = new Frame(closure, this.sp - numArgs);
+    this.pushFrame(frame);
+
+    this.sp = frame.basePointer + closure.func.numLocals;
+  }
+
+  private callBuiltin(builtin: BuiltinObj, numArgs: number) {
+    const args = this.stack.slice(this.sp - numArgs, this.sp);
+    const result = builtin.func(args);
+    this.sp = this.sp - numArgs - 1;
+
+    if (result instanceof ErrorObj) {
+      throw new ExecutionError(result.message);
+    }
+
+    this.push(result);
+  }
+
+  private pushClosure(fnIndex: number, numFree: number) {
+    const fnConstant = this.constants[fnIndex];
+    if (!(fnConstant instanceof CompiledFunctionObj)) {
+      throw new ExecutionError(
+        `cant create closure for type: ${fnConstant.type()}`
+      );
+    }
+
+    const free: Obj[] = [];
+    for (let i = 0; i < numFree; i++) {
+      free.push(this.stack[this.sp - numFree + i]);
+    }
+
+    this.push(new ClosureObj(fnConstant, free));
+  }
+
+  private currentFrame() {
+    return this.frames[this.framesIndex - 1];
+  }
+
+  private pushFrame(f: Frame) {
+    this.frames[this.framesIndex] = f;
+    this.framesIndex++;
+  }
+
+  private popFrame() {
+    this.framesIndex--;
+    return this.frames[this.framesIndex];
   }
 
   private executeBangOperator = () => {
@@ -196,9 +354,13 @@ export default class VM {
   ) => {
     switch (op) {
       case Opcode.OpEqual:
-        return this.push(left === right ? BOOLEAN.TRUE : BOOLEAN.FALSE);
+        return this.push(
+          left.value === right.value ? BOOLEAN.TRUE : BOOLEAN.FALSE
+        );
       case Opcode.OpNotEqual:
-        return this.push(left !== right ? BOOLEAN.TRUE : BOOLEAN.FALSE);
+        return this.push(
+          left.value !== right.value ? BOOLEAN.TRUE : BOOLEAN.FALSE
+        );
       case Opcode.OpGreaterThan:
         return this.push(
           left.value > right.value ? BOOLEAN.TRUE : BOOLEAN.FALSE

@@ -229,7 +229,7 @@ function evaluateIdentifier(node: Identifier, env: Environment): Obj {
   const value = env.get(node.value);
   if (value) return value;
 
-  const builtin = BUILTIN[node.value];
+  const builtin = BUILTIN.find(value => value.name === node.value)?.builtin;
   if (builtin) return builtin;
 
   return new ErrorObj(`identifier not found: ${node.value}`);

@@ -214,6 +214,10 @@ export default class Parser {
       this.nextToken();
     }
 
+    if (expression instanceof FunctionLiteral) {
+      expression.name = name.value;
+    }
+
     return new LetStatement(token, name, expression);
   }
 

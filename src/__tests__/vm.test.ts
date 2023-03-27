@@ -55,6 +55,10 @@ function testHashObject(expected: Map<HashKey, unknown>, actual: Obj) {
   });
 }
 
+function testError(expected: Error, actual: Error) {
+  expect(actual.message).toEqual(expected.message);
+}
+
 function testExpectedObject(expected: unknown, actual: Obj) {
   switch (typeof expected) {
     case 'number':
@@ -86,7 +90,20 @@ function runVmTests(tests: VMTestCase[]) {
 
     compiler.compile(program);
 
+    // console.log(compiler.bytecode().constants);
+    // console.log(disassemble(compiler.bytecode().instructions));
+
     const vm = new VM(compiler.bytecode());
+    if (test.expected instanceof Error) {
+      try {
+        vm.run();
+      } catch (e) {
+        expect(e).toBeInstanceOf(Error);
+        testError(test.expected, e as Error);
+        continue;
+      }
+    }
+
     vm.run();
 
     const stackElement = vm.lastPoppedStackElement();
@@ -211,6 +228,217 @@ describe('vm', () => {
       {input: 'let one = 1; one', expected: 1},
       {input: 'let one = 1; let two = 2; one + two', expected: 3},
       {input: 'let one = 1; let two = one + one; one + two', expected: 3},
+    ];
+
+    runVmTests(tests);
+  });
+
+  it('should run function literals and calls', () => {
+    const tests: VMTestCase[] = [
+      {
+        input: 'let fivePlusTen = fn() { 5 + 10; }; fivePlusTen();',
+        expected: 15,
+      },
+      {
+        input: 'let one = fn() { 1; }; let two = fn() { 2; }; one() + two();',
+        expected: 3,
+      },
+      {
+        input:
+          'let a = fn() { 1; }; let b = fn() { a() + 1; }; let c = fn() { b() + 1;}; c();',
+        expected: 3,
+      },
+      {
+        input: 'let earlyExit = fn() { return 99; 100; }; earlyExit();',
+        expected: 99,
+      },
+      {
+        input: 'let earlyExit = fn() { return 99; return 100; }; earlyExit();',
+        expected: 99,
+      },
+      {
+        input: 'let noReturn = fn() { }; noReturn();',
+        expected: null,
+      },
+      {
+        input: 'let noReturn = fn() { }; fn() { noReturn(); }();',
+        expected: null,
+      },
+      {
+        input: `let globalSeed = 50;
+        let minusOne = fn() {
+          let num = 1;
+          globalSeed - num;
+        }
+        let minusTwo = fn() {
+          let num = 2;
+          globalSeed - num;
+        }
+        minusOne() + minusTwo();`,
+        expected: 97,
+      },
+      {
+        input: `let globalNum = 10;
+        let sum = fn(a, b) {
+          let c = a + b;
+          c + globalNum;
+        };
+
+        let outer = fn() {
+          sum(1, 2) + sum(3, 4) + globalNum;
+        };
+
+        outer() + globalNum;`,
+        expected: 50,
+      },
+      {
+        input: 'fn() { 1; }(1)',
+        expected: new Error('wrong number of arguments: expected 0, got 1'),
+      },
+      {
+        input: 'fn(a) { a; }()',
+        expected: new Error('wrong number of arguments: expected 1, got 0'),
+      },
+      {
+        input: 'fn(a, b) { a + b; }(1)',
+        expected: new Error('wrong number of arguments: expected 2, got 1'),
+      },
+      {
+        input: 'fn(a) { a(); }(1)',
+        expected: new Error('cannot call object of type INTEGER'),
+      },
+    ];
+
+    runVmTests(tests);
+  });
+
+  it('should run builtin calls', () => {
+    const tests: VMTestCase[] = [
+      {
+        input: 'len("")',
+        expected: 0,
+      },
+      {
+        input: 'len("four")',
+        expected: 4,
+      },
+      {
+        input: 'len(1)',
+        expected: new Error("argument INTEGER to 'len' not supported"),
+      },
+      {
+        input: 'len("one", "two")',
+        expected: new Error("invalid number of arguments for 'len'"),
+      },
+    ];
+
+    runVmTests(tests);
+  });
+
+  it('should run closures', () => {
+    const tests: VMTestCase[] = [
+      {
+        input: `let newClosure = fn(a) {
+          fn() { a; }
+        };
+        let closure = newClosure(99);
+        closure();`,
+        expected: 99,
+      },
+      {
+        input: `let newAdder = fn(a, b) {
+          fn(c) { a + b + c};
+        };
+        let adder = newAdder(1, 2);
+        adder(8);`,
+        expected: 11,
+      },
+      {
+        input: `let newAdder = fn(a, b) {
+          let c = a + b;
+          fn(d) { c + d }
+        };
+        let adder = newAdder(1, 2);
+        adder(8);`,
+        expected: 11,
+      },
+      {
+        input: `let newClosure = fn(a, b) {
+          let one = fn() { a; };
+          let two = fn() { b; };
+          return fn() { one() + two(); };
+        };
+        let closure = newClosure(9, 90);
+        closure();`,
+        expected: 99,
+      },
+      {
+        input: `let countdown = fn(x) {
+          if (x == 0) {
+            return 0;
+          } else {
+            countdown(x - 1);
+          }
+        };
+        countdown(1);
+        `,
+        expected: 0,
+      },
+      {
+        input: `let countdown = fn(x) {
+          if (x == 0) {
+            return 0;
+          } else {
+            countdown(x - 1);
+          }
+        };
+        let wrapper = fn() {
+          countdown(1);
+        }
+        wrapper();
+        `,
+        expected: 0,
+      },
+      {
+        input: `let wrapper = fn() {
+          let countdown = fn(x) {
+            if (x == 0) {
+              return 0;
+            } else {
+              countdown(x - 1);
+            }
+          };
+          countdown(1);
+        };
+        wrapper();
+        `,
+        expected: 0,
+      },
+    ];
+
+    runVmTests(tests);
+  });
+});
+
+describe('RUNS FIBONACCI RECURSION!', () => {
+  it('should run recursive fibonacci function', () => {
+    const tests: VMTestCase[] = [
+      {
+        input: `
+        let fib = fn(x) {
+          if (x == 0) {
+            return 0;
+          } else {
+            if (x == 1) {
+              return 1;
+            } else {
+              return fib(x - 1) + fib(x - 2);
+            }
+          }
+        };
+        fib(15);`,
+        expected: 610,
+      },
     ];
 
     runVmTests(tests);

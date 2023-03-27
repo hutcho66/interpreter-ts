@@ -8,6 +8,7 @@ import Compiler from './compiler';
 import VM from './vm';
 import {GLOBALS_SIZE} from './vm';
 import SymbolTable from './symbol_table';
+import {BUILTIN} from './builtins';
 
 const PROMPT = '>> ';
 const prompter = prompt({
@@ -43,6 +44,7 @@ function compiler() {
       continue;
     }
 
+    BUILTIN.forEach((value, i) => symbolTable.defineBuiltin(i, value.name));
     const compiler = new Compiler(symbolTable, constants);
     try {
       compiler.compile(program);

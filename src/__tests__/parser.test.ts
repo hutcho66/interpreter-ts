@@ -376,6 +376,22 @@ describe('parser', () => {
     expect(body.statements[0].string()).toEqual('(x + y);');
   });
 
+  it('should parse function literals with name', () => {
+    const input = 'let myFunc = fn() { }';
+
+    const lexer = new Lexer(input);
+    const parser = new Parser(lexer);
+
+    const program = parser.parseProgram();
+
+    expect(parser.errors).toHaveLength(0);
+    expect(program.statements).toHaveLength(1);
+
+    const statement = program.statements[0] as LetStatement;
+    const func = statement.value as FunctionLiteral;
+    expect(func.name).toEqual('myFunc');
+  });
+
   it('should parse call expressions', () => {
     const input = 'add(1, 2 * 3, 4 + 5)';
 

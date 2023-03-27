@@ -1,4 +1,5 @@
 import {Identifier, BlockStatement} from './ast';
+import {Instructions} from './code';
 
 export const enum ObjectType {
   EMPTY_OBJ = 'EMPTY',
@@ -11,6 +12,8 @@ export const enum ObjectType {
   BREAK_OBJ = 'BREAK',
   ERROR_OBJ = 'ERROR',
   FUNCTION_OBJ = 'FUNCTION',
+  COMPILED_FUNCTION_OBJ = 'COMPILED_FUNCTION',
+  CLOSURE_OBJ = 'CLOSURE',
   BUILTIN_OBJ = 'BUILTIN',
   ARRAY_OBJ = 'ARRAY',
   HASH_OBJ = 'HASH',
@@ -166,9 +169,25 @@ export class FunctionObj implements Obj {
     public env: Environment
   ) {}
   type = () => ObjectType.FUNCTION_OBJ;
-  inspect = () => {
-    return '[Function]';
-  };
+  inspect = () => '[Function]';
+  display = this.inspect;
+}
+
+export class CompiledFunctionObj implements Obj {
+  constructor(
+    public instructions: Instructions,
+    public numLocals: number,
+    public numParameters: number
+  ) {}
+  type = () => ObjectType.COMPILED_FUNCTION_OBJ;
+  inspect = () => '[Function]';
+  display = this.inspect;
+}
+
+export class ClosureObj implements Obj {
+  constructor(public func: CompiledFunctionObj, public free: Obj[]) {}
+  type = () => ObjectType.CLOSURE_OBJ;
+  inspect = () => '[Closure]';
   display = this.inspect;
 }
 

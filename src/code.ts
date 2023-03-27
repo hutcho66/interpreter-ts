@@ -19,9 +19,18 @@ export const enum Opcode {
   OpJump,
   OpGetGlobal,
   OpSetGlobal,
+  OpGetLocal,
+  OpSetLocal,
+  OpGetBuiltin,
   OpArray,
   OpHash,
   OpIndex,
+  OpCall,
+  OpReturnValue,
+  OpReturnNull,
+  OpClosure,
+  OpGetFree,
+  OpCurrentClosure,
 }
 
 type Definition = {
@@ -102,6 +111,18 @@ const definitions: {[key in Opcode]?: Definition} = {
     name: 'OpSetGlobal',
     operandWidths: [2],
   },
+  [Opcode.OpGetLocal]: {
+    name: 'OpGetLocal',
+    operandWidths: [1],
+  },
+  [Opcode.OpSetLocal]: {
+    name: 'OpSetLocal',
+    operandWidths: [1],
+  },
+  [Opcode.OpGetBuiltin]: {
+    name: 'OpGetBuiltin',
+    operandWidths: [1],
+  },
   [Opcode.OpArray]: {
     name: 'OpArray',
     operandWidths: [2],
@@ -112,6 +133,30 @@ const definitions: {[key in Opcode]?: Definition} = {
   },
   [Opcode.OpIndex]: {
     name: 'OpIndex',
+    operandWidths: [],
+  },
+  [Opcode.OpCall]: {
+    name: 'OpCall',
+    operandWidths: [1],
+  },
+  [Opcode.OpReturnValue]: {
+    name: 'OpReturnValue',
+    operandWidths: [],
+  },
+  [Opcode.OpReturnNull]: {
+    name: 'OpReturnNull',
+    operandWidths: [],
+  },
+  [Opcode.OpClosure]: {
+    name: 'OpClosure',
+    operandWidths: [2, 1],
+  },
+  [Opcode.OpGetFree]: {
+    name: 'OpGetFree',
+    operandWidths: [1],
+  },
+  [Opcode.OpCurrentClosure]: {
+    name: 'OpCurrentClosure',
     operandWidths: [],
   },
 };
@@ -132,8 +177,12 @@ export function make(op: Opcode, ...operands: number[]): Instructions {
   operands.forEach((operand, i) => {
     const width = def.operandWidths[i];
     switch (width) {
+      case 1:
+        buffer.writeUint8(operand, offset);
+        break;
       case 2:
         buffer.writeUint16BE(operand, offset);
+        break;
     }
     offset += width;
   });
@@ -150,8 +199,12 @@ export function readOperands(
   let offset = startOffset;
   for (const width of def.operandWidths) {
     switch (width) {
+      case 1:
+        operands.push(instructions.readUInt8(offset));
+        break;
       case 2:
         operands.push(instructions.readUint16BE(offset));
+        break;
     }
 
     offset += width;
@@ -195,6 +248,8 @@ function formatInstruction(def: Definition, operands: number[]) {
       return def.name;
     case 1:
       return `${def.name} ${operands[0]}`;
+    case 2:
+      return `${def.name} ${operands[0]} ${operands[1]}`;
   }
 
   return `ERROR: unhandled operand count for ${def.name}`;

@@ -1,5 +1,8 @@
 {
   "name": "interpreter-ts",
+  "engines": {
+    "node": ">10.7.0"
+  },
   "devDependencies": {
     "@types/jest": "^29.4.0",
     "@types/node": "^14.11.2",
@@ -22,7 +25,9 @@
     "fix": "gts fix",
     "prepare": "yarn run compile",
     "posttest": "yarn run lint",
-    "repl": "node build/index.js"
+    "repl": "node build/index.js",
+    "benchmark:compiler": "node build/benchmark.js --compiler",
+    "benchmark:interpreter": "node build/benchmark.js --interpreter"
   },
   "repository": {
     "type": "git",

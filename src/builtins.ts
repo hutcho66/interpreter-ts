@@ -107,14 +107,14 @@ const puts = (args: Obj[]) => {
   return EMPTY;
 };
 
-const BUILTIN: {[key: string]: BuiltinObj} = {
-  len: new BuiltinObj(len),
-  first: new BuiltinObj(first),
-  last: new BuiltinObj(last),
-  rest: new BuiltinObj(rest),
-  push: new BuiltinObj(push),
-  puts: new BuiltinObj(puts),
-};
+const BUILTIN: {name: string; builtin: BuiltinObj}[] = [
+  {name: 'len', builtin: new BuiltinObj(len)},
+  {name: 'puts', builtin: new BuiltinObj(puts)},
+  {name: 'first', builtin: new BuiltinObj(first)},
+  {name: 'last', builtin: new BuiltinObj(last)},
+  {name: 'rest', builtin: new BuiltinObj(rest)},
+  {name: 'push', builtin: new BuiltinObj(push)},
+];
 
 export {BOOLEAN, INTEGER, NULL, EMPTY, BUILTIN};
 
