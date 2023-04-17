@@ -1,4 +1,4 @@
-# Typescript Monkey Interpreter
+# Typescript Monkey Interpreter and Compiler
 
 Typescript port of [Thorsten Ball's Monkey Interpreter](https://interpreterbook.com/)
 
@@ -16,7 +16,15 @@ Run the REPL to test the lexer
 
 ```bash
 yarn compile
-yarn repl
+yarn repl --[interpeter|compiler]
+```
+
+## Benchmark
+
+```
+yarn compile
+yarn benchmark:compiler
+yarn benchmark:interpreter
 ```
 
 ## Tests
